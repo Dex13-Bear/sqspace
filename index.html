@@ -1172,10 +1172,164 @@ function ScheduleTab({ project }) {
 /* ══════════════════════════════════════════
    PAYMENT TAB
 ══════════════════════════════════════════ */
+
+function generateInvoice(project, stages, invoiceNum) {
+  const tAmt = stages.reduce((s,x)=>s+(x.amount||0),0);
+  const currentStages = stages.filter(s=>s.is_current);
+  const currentTotal = currentStages.reduce((s,x)=>s+(x.amount||0),0);
+  const paidStages = stages.filter(s=>!s.is_current && (s.paid_amount||0)>0);
+  const date = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'numeric',day:'numeric'}).replace(/\//g,'/');
+
+  const rowsHtml = stages.map((s,i) => {
+    const tag = s.is_current ? '本期請領' : ((s.paid_amount||0)>0 ? '已請領' : '');
+    const amt = s.amount || 0;
+    return `<tr>
+      <td style="padding:10px 8px;border-bottom:1px solid #E8E8E8;font-size:13px">${i+1}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #E8E8E8;font-size:13px">${s.name}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #E8E8E8;font-size:13px;text-align:center">1</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #E8E8E8;font-size:13px;text-align:right">$${amt.toLocaleString()}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #E8E8E8;font-size:13px;color:${s.is_current?'#1A1A18':'#888'}">${tag}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #E8E8E8;font-size:13px;text-align:right;font-weight:${s.is_current?700:400};color:${s.is_current?'#1A1A18':'#AAA'}">${amt.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8">
+<title>Invoice #${invoiceNum} - ${project.name}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;color:#1A1A18;font-size:13px;background:#fff;padding:40px}
+  @media print{body{padding:20px} .no-print{display:none!important} @page{size:A4;margin:15mm}}
+  .no-print{margin-bottom:20px;display:flex;gap:10px}
+  .no-print button{padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+</style>
+</head>
+<body>
+<div class="no-print">
+  <button onclick="window.print()" style="background:#1A1A18;color:#fff">🖨 列印 / 存成 PDF</button>
+  <button onclick="window.close()" style="background:#F0F0EC;color:#555">關閉</button>
+</div>
+
+<table style="width:100%;border-collapse:collapse;margin-bottom:32px">
+  <tr>
+    <td style="width:50%;vertical-align:top">
+    </td>
+    <td style="width:50%;vertical-align:top;text-align:right">
+      <div style="font-size:11px;color:#888;line-height:1.8">
+        無澀空間ARTRIUM<br>
+        105405 台北市內湖區陽光街321巷18號4樓<br>
+        M / 0910119114<br>
+        E / Dexigner13@gmail.com
+      </div>
+    </td>
+  </tr>
+</table>
+
+<div style="border-top:2px solid #1A1A18;border-bottom:1px solid #1A1A18;padding:16px 0;margin-bottom:24px">
+  <h1 style="font-size:28px;font-weight:700;letter-spacing:.05em">Invoice</h1>
+</div>
+
+<table style="width:100%;border-collapse:collapse;margin-bottom:32px">
+  <tr>
+    <td style="width:50%;vertical-align:top"></td>
+    <td style="width:50%;vertical-align:top">
+      <table style="width:100%;border-collapse:collapse">
+        ${[
+          ['Invoice #', invoiceNum],
+          ['Date', date],
+          ['Bill to', ''],
+          ['Customer', project.client_name||'—'],
+          ['Address', project.address||'—'],
+          ['合約金額', '$'+tAmt.toLocaleString()],
+        ].map(([k,v])=>`<tr>
+          <td style="padding:4px 12px 4px 0;font-size:13px;color:#888;white-space:nowrap">${k}</td>
+          <td style="padding:4px 0;font-size:13px;font-weight:${k==='合約金額'?700:400}">${v}</td>
+        </tr>`).join('')}
+      </table>
+    </td>
+  </tr>
+</table>
+
+<table style="width:100%;border-collapse:collapse;margin-bottom:32px">
+  <thead>
+    <tr style="border-bottom:2px solid #1A1A18">
+      <th style="padding:10px 8px;text-align:left;font-size:12px;width:40px"></th>
+      <th style="padding:10px 8px;text-align:left;font-size:12px">Description</th>
+      <th style="padding:10px 8px;text-align:center;font-size:12px;width:70px">Quantity</th>
+      <th style="padding:10px 8px;text-align:right;font-size:12px;width:100px">Rate</th>
+      <th style="padding:10px 8px;text-align:left;font-size:12px;width:80px"></th>
+      <th style="padding:10px 8px;text-align:right;font-size:12px;width:100px">Amount</th>
+    </tr>
+  </thead>
+  <tbody>${rowsHtml}</tbody>
+</table>
+
+<table style="width:100%;border-collapse:collapse;margin-bottom:40px">
+  <tr>
+    <td style="width:50%"></td>
+    <td style="width:50%">
+      <div style="display:flex;justify-content:space-between;padding:10px 8px;border-top:1px solid #1A1A18">
+        <span style="font-size:13px">Subtotal：</span>
+        <span style="font-size:13px;font-weight:500">${currentTotal.toLocaleString()}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:12px 8px;border-top:2px solid #1A1A18;border-bottom:2px solid #1A1A18">
+        <span style="font-size:15px;font-weight:700">GRAND TOTAL：</span>
+        <span style="font-size:15px;font-weight:700">${currentTotal.toLocaleString()}</span>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<div style="margin-bottom:32px;padding:16px;background:#F8F8F4;border-radius:6px">
+  <div style="font-weight:700;margin-bottom:12px;font-size:13px">付款方式：下列方式二擇一辦理</div>
+  <table style="width:100%;border-collapse:collapse">
+    <tr>
+      <td style="vertical-align:top;width:50%;padding-right:20px">
+        <div style="font-weight:600;margin-bottom:6px">1. 匯款支付</div>
+        <div style="font-size:12px;line-height:2;color:#555">
+          戶名：鄭凱群<br>
+          銀行別：012 台北富邦 營業部<br>
+          帳號：81680008713711
+        </div>
+      </td>
+      <td style="vertical-align:top;width:50%">
+        <div style="font-weight:600;margin-bottom:6px">2. 開立支票</div>
+        <div style="font-size:12px;line-height:2;color:#555">
+          支票抬頭：鄭凱群
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div style="font-size:11px;color:#888;margin-bottom:8px">Remark: The grand total cost of this payment is exclusive of 5% VAT.</div>
+<div style="font-size:11px;color:#888;margin-bottom:40px">*未列項目及尺寸增加均列為追加項目</div>
+
+<table style="width:100%;border-collapse:collapse;border-top:1px solid #1A1A18;padding-top:16px;margin-top:16px">
+  <tr>
+    <td style="width:50%;text-align:center;padding-top:16px;font-size:12px;color:#888">
+      SUBMITTED BY DESIGNER<br><br>
+      <div style="margin-top:40px;border-top:1px solid #888;display:inline-block;min-width:180px;padding-top:6px">無澀空間 ARTRIUM</div>
+    </td>
+    <td style="width:50%;text-align:center;padding-top:16px;font-size:12px;color:#888">
+      AGREED & ACCEPTED BY<br><br>
+      <div style="margin-top:40px;border-top:1px solid #888;display:inline-block;min-width:180px;padding-top:6px">&nbsp;</div>
+    </td>
+  </tr>
+</table>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+
 function PaymentTab({ project }) {
   const [stages, setStages] = useDB('pays_'+project.id, []);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({name:'',amount:0,paid_amount:0,paid_date:'',is_current:false});
+  const [invoiceNum, setInvoiceNum] = useState('1');
 
   const tAmt = stages.reduce((s,x)=>s+(x.amount||0),0);
   const tPaid = stages.reduce((s,x)=>s+(x.paid_amount||0),0);
@@ -1186,8 +1340,19 @@ function PaymentTab({ project }) {
     <div>
       <div className="section-header">
         <div className="section-title">付款管理</div>
-        <button className="btn btn-primary btn-sm" onClick={()=>setStages(p=>[...p,{id:nid(),name:'新期款',amount:0,paid_amount:0,paid_date:'',is_current:false,sort_order:p.length}])}>＋ 新增期款</button>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,background:'#F8F8F4',border:'1px solid #E4E4DC',borderRadius:6,padding:'4px 10px'}}>
+            <span style={{fontSize:12,color:'#888'}}>Invoice #</span>
+            <input value={invoiceNum} onChange={e=>setInvoiceNum(e.target.value)}
+              style={{width:40,border:'none',background:'transparent',fontSize:13,fontWeight:600,outline:'none',textAlign:'center'}}/>
+          </div>
+          <button className="btn btn-gold btn-sm" onClick={()=>generateInvoice(project, stages, invoiceNum)}>
+            🖨 產生請款單
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={()=>setStages(p=>[...p,{id:nid(),name:'新期款',amount:0,paid_amount:0,paid_date:'',is_current:false,sort_order:p.length}])}>＋ 新增期款</button>
+        </div>
       </div>
+
       <div className="grid-3 mb-4">
         <div className="stat-card"><div className="stat-val">{fmt(tAmt)}</div><div className="stat-lbl">合約總金額</div></div>
         <div className="stat-card"><div className="stat-val" style={{color:'#C8A96E'}}>{fmt(tPaid)}</div><div className="stat-lbl">已收金額</div></div>
@@ -1198,6 +1363,43 @@ function PaymentTab({ project }) {
         <div style={{flex:1}}><div className="pb-wrap"><div className="pb-fill" style={{width:pct+'%'}}/></div></div>
         <span style={{fontSize:13,fontWeight:600,color:'#C8A96E',flexShrink:0}}>{pct}%</span>
       </div>
+
+      {/* Invoice preview */}
+      {stages.length>0&&(
+        <div style={{background:'#F8F8F4',border:'1px solid #E4E4DC',borderRadius:8,padding:'14px 18px',marginBottom:20,fontSize:12,color:'#555'}}>
+          <div style={{fontWeight:600,marginBottom:8,fontSize:13}}>請款單預覽</div>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead><tr style={{borderBottom:'1.5px solid #1A1A18'}}>
+              <th style={{padding:'6px 8px',textAlign:'left',fontSize:11,color:'#888'}}>#</th>
+              <th style={{padding:'6px 8px',textAlign:'left',fontSize:11,color:'#888'}}>Description</th>
+              <th style={{padding:'6px 8px',textAlign:'right',fontSize:11,color:'#888'}}>Rate</th>
+              <th style={{padding:'6px 8px',textAlign:'left',fontSize:11,color:'#888'}}></th>
+              <th style={{padding:'6px 8px',textAlign:'right',fontSize:11,color:'#888'}}>Amount</th>
+            </tr></thead>
+            <tbody>
+              {stages.map((s,i)=>{
+                const tag = s.is_current?'本期請領':((s.paid_amount||0)>0?'已請領':'');
+                return <tr key={s.id} style={{borderBottom:'1px solid #EAEAE4',background:s.is_current?'#FFF8EC':'transparent'}}>
+                  <td style={{padding:'8px',fontSize:12}}>{i+1}</td>
+                  <td style={{padding:'8px',fontSize:12,fontWeight:s.is_current?600:400}}>{s.name}</td>
+                  <td style={{padding:'8px',textAlign:'right',fontSize:12}}>${(s.amount||0).toLocaleString()}</td>
+                  <td style={{padding:'8px',fontSize:11,color:s.is_current?'#C8A96E':'#AAA'}}>{tag}</td>
+                  <td style={{padding:'8px',textAlign:'right',fontSize:12,fontWeight:s.is_current?700:400,color:s.is_current?'#1A1A18':'#AAA'}}>{(s.amount||0).toLocaleString()}</td>
+                </tr>;
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{borderTop:'2px solid #1A1A18'}}>
+                <td colSpan={3}></td>
+                <td style={{padding:'8px',fontSize:12,fontWeight:600}}>GRAND TOTAL：</td>
+                <td style={{padding:'8px',textAlign:'right',fontSize:13,fontWeight:700}}>{stages.filter(s=>s.is_current).reduce((s,x)=>s+(x.amount||0),0).toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style={{marginTop:10,fontSize:11,color:'#AAA'}}>💡 勾選「本期」的期款會出現在請款單的 GRAND TOTAL</div>
+        </div>
+      )}
+
       {stages.map(s=>{
         const st=stOf(s); const p2=s.amount?Math.min(100,Math.round((s.paid_amount||0)/s.amount*100)):0;
         return (
