@@ -1555,7 +1555,6 @@ function FoldersTab({ project }) {
 ══════════════════════════════════════════ */
 const PROJ_TABS = [
   {key:'summary',label:'專案總覽'},{key:'flow',label:'專案流程'},
-  {key:'folders',label:'📁 資料夾'},
   {key:'work',label:'工程明細'},{key:'purchase',label:'採購明細'},
   {key:'schedule',label:'進度排程'},{key:'payment',label:'付款管理'},
   {key:'todos',label:'待辦事項'},{key:'sitelog',label:'施工日誌'},
@@ -1568,7 +1567,6 @@ function ProjectDetail({ project, onUpdate, onBack }) {
   const content = useMemo(()=>{
     if(tab==='summary')  return <SummaryTab project={project} onUpdate={onUpdate}/>;
     if(tab==='flow')     return <FlowTab project={project}/>;
-    if(tab==='folders')  return <FoldersTab project={project}/>;
     if(tab==='work')     return <WorkTab project={project}/>;
     if(tab==='purchase') return <PurchaseTab project={project}/>;
     if(tab==='schedule') return <ScheduleTab project={project}/>;
