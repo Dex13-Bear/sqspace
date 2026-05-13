@@ -2,13 +2,19 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SQ Space 專案管理</title>
+<title>無澀空間 專案管理</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans TC',sans-serif;background:#F5F5F2;color:#2E2E2E;font-size:14px;line-height:1.6}
@@ -25,7 +31,7 @@ button{cursor:pointer}
 .page-body{flex:1;overflow-y:auto;padding:24px}
 
 .sidebar-logo{padding:16px 16px 14px;border-bottom:1px solid #2C2C28;display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0}
-.sb-mark{width:34px;height:34px;background:#C8A96E;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#1A1A18;flex-shrink:0;letter-spacing:-.02em}
+.sb-mark{width:34px;height:34px;background:#C8A96E;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#1A1A18;flex-shrink:0;letter-spacing:-.02em}
 .sb-name{font-size:14px;font-weight:600;color:#fff;letter-spacing:.04em}
 .sb-item{display:flex;align-items:center;gap:9px;padding:8px 16px;color:#777770;cursor:pointer;transition:all .15s;font-size:12.5px;border-left:2px solid transparent;user-select:none}
 .sb-item:hover{background:#252521;color:#CCC}
@@ -166,9 +172,48 @@ th.num{text-align:right}
 </style>
 </head>
 <body>
+
+<style>
+#app-loading{position:fixed;inset:0;background:#1A1A18;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .5s}
+#app-loading.hidden{opacity:0;pointer-events:none}
+.load-logo{width:56px;height:56px;background:#C8A96E;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#1A1A18;margin-bottom:20px;animation:pulse 1.5s ease-in-out infinite}
+.load-text{color:#888;font-size:13px;margin-top:12px;font-family:sans-serif}
+.load-bar{width:160px;height:3px;background:#333;border-radius:3px;margin-top:16px;overflow:hidden}
+.load-fill{height:100%;background:#C8A96E;border-radius:3px;animation:loading 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes loading{0%{width:0;margin-left:0}50%{width:100%;margin-left:0}100%{width:0;margin-left:100%}}
+#app-error{display:none;position:fixed;inset:0;background:#1A1A18;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#888;font-family:sans-serif;text-align:center;padding:20px}
+#app-error h2{color:#C8A96E;font-size:18px;margin-bottom:12px}
+#app-error a{color:#C8A96E;margin-top:16px;display:inline-block}
+</style>
+<div id="app-loading">
+  <div class="load-logo">無澀</div>
+  <div class="load-text">無澀空間 載入中...</div>
+  <div class="load-bar"><div class="load-fill"></div></div>
+</div>
+<div id="app-error">
+  <h2>⚠ 載入失敗</h2>
+  <p>請重新整理頁面，或使用 Chrome / Safari 開啟</p>
+  <a href="javascript:location.reload()">🔄 重新整理</a>
+</div>
+<script>
+// Show error if app doesn't load within 15 seconds
+var _loadTimer = setTimeout(function(){
+  var el = document.getElementById('app-loading');
+  var er = document.getElementById('app-error');
+  if(el) el.style.display='none';
+  if(er) er.style.display='flex';
+}, 15000);
+function _appReady(){
+  clearTimeout(_loadTimer);
+  var el = document.getElementById('app-loading');
+  if(el){el.classList.add('hidden');setTimeout(function(){el.remove()},600);}
+}
+</script>
+
 <div id="root"></div>
 <div id="toasts" style="position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
-<script type="text/babel">
+<script type="text/babel" data-presets="react">
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
 /* ─── Toast ─── */
@@ -186,8 +231,227 @@ const fmt = n => 'NT$' + Math.round(n||0).toLocaleString();
 const todayStr = () => new Date().toISOString().split('T')[0];
 const fmtDate = d => d ? d.replace(/-/g,'/') : '—';
 
-/* ─── LocalStorage DB ─── */
-let _nid = +（localStorage.getItem('sq_nid')||1000);
+/* ─── Google Sheets API ─── */
+const GS_URL = 'https://script.google.com/macros/s/AKfycbyudkPsVOIlW2QhpK788UOmpcJQdTb3UJu6y1qa0dADDmpP-aUlTPNw6Q2HTvQFj6u1Qg/exec';
+
+async function gsGet(params) {
+  const url = GS_URL + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  return res.json();
+}
+
+async function gsPost(body) {
+  const res = await fetch(GS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+// Sync state: 'idle' | 'syncing' | 'ok' | 'error'
+let _syncStatus = 'idle';
+let _syncListeners = [];
+function onSyncChange(fn) { _syncListeners.push(fn); }
+function setSyncStatus(s) { _syncStatus = s; _syncListeners.forEach(f => f(s)); }
+
+// Pull all data from Sheets and store to localStorage
+async function gsPullAll() {
+  setSyncStatus('syncing');
+  try {
+    const res = await gsGet({ action: 'readAll' });
+    if (!res.ok) throw new Error(res.error);
+    const d = res.data;
+    // Map sheet names to localStorage keys
+    if (d.projects) lsSet('projects', d.projects);
+    // Per-project data
+    const pids = (d.projects||[]).map(p => p.id);
+    pids.forEach(pid => {
+      ['work_cats','work_items','purchase_cats','purchase_items',
+       'pays','todos','schedule','schedule_events','sitelog',
+       'meetings','meeting_items','flow','folders'].forEach(table => {
+        const rows = (d[table]||[]).filter(r => String(r.project_id) === String(pid));
+        if (rows.length > 0 || d[table]) {
+          const keyMap = {
+            work_cats: 'wcats_', work_items: 'witems_',
+            purchase_cats: 'pcats_', purchase_items: 'pitems_',
+            pays: 'pays_', todos: 'todos_', schedule: 'sched_',
+            schedule_events: 'sevents_', sitelog: 'sitelog_',
+            meetings: 'mtg_', meeting_items: 'mtg_items_',
+            flow: 'flow_', folders: 'folders_',
+          };
+          lsSet((keyMap[table]||table+'_') + pid, rows);
+        }
+      });
+    });
+    setSyncStatus('ok');
+    toast('已從 Google Sheets 同步資料 ✓');
+    return true;
+  } catch(e) {
+    setSyncStatus('error');
+    toast('同步失敗：' + e.message, 'error');
+    return false;
+  }
+}
+
+// Push one project and all its data to Sheets
+async function gsPushProject(pid) {
+  setSyncStatus('syncing');
+  try {
+    const projects = lsGet('projects', []);
+    const project = projects.find(p => String(p.id) === String(pid));
+    if (!project) throw new Error('找不到專案');
+
+    const addPid = (rows) => (rows||[]).map(r => ({...r, project_id: pid}));
+
+    const payload = {
+      action: 'saveProject',
+      sheet: 'projects',
+      data: {
+        project,
+        work_cats:      addPid(lsGet('wcats_'+pid,[])),
+        work_items:     addPid(lsGet('witems_'+pid,[])),
+        purchase_cats:  addPid(lsGet('pcats_'+pid,[])),
+        purchase_items: addPid(lsGet('pitems_'+pid,[])),
+        pays:           addPid(lsGet('pays_'+pid,[])),
+        todos:          addPid(lsGet('todos_'+pid,[])),
+        schedule:       addPid(lsGet('sched_'+pid,[])),
+        schedule_events:addPid(lsGet('sevents_'+pid,[])),
+        sitelog:        addPid(lsGet('sitelog_'+pid,[])),
+        meetings:       addPid(lsGet('mtg_'+pid,[])),
+        meeting_items:  addPid(lsGet('mtg_items_'+pid,[])),
+        flow:           addPid(lsGet('flow_'+pid,[])),
+        folders:        addPid(lsGet('folders_'+pid,[])),
+      }
+    };
+    const res = await gsPost(payload);
+    if (!res.ok) throw new Error(res.error);
+    setSyncStatus('ok');
+    return true;
+  } catch(e) {
+    setSyncStatus('error');
+    toast('儲存失敗：' + e.message, 'error');
+    return false;
+  }
+}
+
+/* ─── Sync Button ─── */
+function SyncButton({ projectId }) {
+  const [status, setStatus] = useState(_syncStatus);
+  const [lastSync, setLastSync] = useState(lsGet('last_sync', null));
+
+  useEffect(() => {
+    const handler = s => setStatus(s);
+    onSyncChange(handler);
+    return () => { _syncListeners = _syncListeners.filter(f => f !== handler); };
+  }, []);
+
+  const pull = async () => {
+    const ok = await gsPullAll();
+    if (ok) { const t = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}); lsSet('last_sync',t); setLastSync(t); setTimeout(()=>location.reload(),1200); }
+  };
+
+  const push = async () => {
+    if (!projectId) {
+      // Push all projects
+      const projects = lsGet('projects', []);
+      setSyncStatus('syncing');
+      for (const p of projects) { await gsPushProject(p.id); }
+      const t = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+      lsSet('last_sync',t); setLastSync(t); setSyncStatus('ok');
+      toast('所有專案已同步至 Google Sheets ☁️');
+    } else {
+      const ok = await gsPushProject(projectId);
+      if (ok) { const t = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}); lsSet('last_sync',t); setLastSync(t); toast('專案已儲存至 Google Sheets ☁️'); }
+    }
+  };
+
+  const color = status==='ok'?'#3A5240':status==='error'?'#8B2E2E':status==='syncing'?'#C8A96E':'#888';
+  const icon = status==='syncing'?'⏳':status==='ok'?'☁️':status==='error'?'⚠':'☁️';
+
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:6}}>
+      {lastSync&&<span style={{fontSize:10,color:'#AAA',flexShrink:0}}>同步於 {lastSync}</span>}
+      <button onClick={push} disabled={status==='syncing'} style={{
+        display:'inline-flex',alignItems:'center',gap:5,padding:'6px 12px',
+        background:'#C8A96E',color:'#1A1A18',border:'none',borderRadius:6,
+        fontSize:12,fontWeight:600,cursor:status==='syncing'?'wait':'pointer',
+        opacity:status==='syncing'?.7:1,transition:'opacity .15s'
+      }}>
+        {icon} {status==='syncing'?'儲存中...':'儲存至雲端'}
+      </button>
+      <button onClick={pull} disabled={status==='syncing'} style={{
+        display:'inline-flex',alignItems:'center',gap:5,padding:'6px 12px',
+        background:'transparent',color:'#555',border:'1px solid #D4D4CE',borderRadius:6,
+        fontSize:12,cursor:status==='syncing'?'wait':'pointer',opacity:status==='syncing'?.7:1
+      }}>
+        ↓ 從雲端載入
+      </button>
+    </div>
+  );
+}
+
+/* ─── Backup / Restore (local) ─── */
+function collectAllData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('sq_')) {
+      try { data[k] = JSON.parse(localStorage.getItem(k)); } catch { data[k] = localStorage.getItem(k); }
+    }
+  }
+  return data;
+}
+
+function exportBackup() {
+  const payload = { version: 2, ts: new Date().toISOString(), app: '無澀空間', data: collectAllData() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.href = url; a.download = `無澀空間_備份_${date}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('備份已下載 ✓');
+}
+
+function importBackup(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const json = JSON.parse(e.target.result);
+      if (!json.data) { toast('備份格式錯誤', 'error'); return; }
+      if (!confirm(`確定還原備份？（${json.ts?.slice(0,10) || '未知日期'}）\n目前資料將被覆蓋。`)) return;
+      Object.entries(json.data).forEach(([k,v]) => {
+        localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+      });
+      toast('還原成功，重新載入中...');
+      setTimeout(() => location.reload(), 1200);
+    } catch { toast('備份檔案讀取失敗', 'error'); }
+  };
+  reader.readAsText(file);
+}
+
+function BackupButton() {
+  const fileRef = React.useRef(null);
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:6}}>
+      <button onClick={exportBackup} style={{
+        display:'inline-flex',alignItems:'center',gap:5,padding:'5px 10px',
+        background:'transparent',color:'#888',border:'1px solid #D4D4CE',borderRadius:6,
+        fontSize:11,cursor:'pointer'
+      }}>⬇ 本機備份</button>
+      <button onClick={()=>fileRef.current.click()} style={{
+        display:'inline-flex',alignItems:'center',gap:5,padding:'5px 10px',
+        background:'transparent',color:'#888',border:'1px solid #D4D4CE',borderRadius:6,
+        fontSize:11,cursor:'pointer'
+      }}>⬆ 還原</button>
+      <input ref={fileRef} type="file" accept=".json" style={{display:'none'}}
+        onChange={e=>{ importBackup(e.target.files[0]); e.target.value=''; }}/>
+    </div>
+  );
+}
+let _nid = +(localStorage.getItem('sq_nid')||1000);
 const nid = () => { _nid++; localStorage.setItem('sq_nid', _nid); return _nid; };
 
 function lsGet(k, def) {
@@ -337,8 +601,8 @@ function SummaryTab({ project, onUpdate }) {
               </div>
             ))}
             {cats.length>0&&<div className="divider"/>}
-            {[['工程小計',workTotal],dFee?['設計費',dFee]:null,['管理費（'+(project.management_fee_rate||7)+'%）',mFee],
-              project.tax_enabled?['營業稅（'+(project.tax_rate||5)+'%）',tax]:null,pTotal?['採購總計',pTotal]:null
+            {[['工程小計',workTotal],dFee?['設計費',dFee]:null,['管理費 ('+(project.management_fee_rate||7)+'%)',mFee],
+              project.tax_enabled?['營業稅 ('+(project.tax_rate||5)+'%)',tax]:null,pTotal?['採購總計',pTotal]:null
             ].filter(Boolean).map(([k,v])=>(
               <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:12,color:'#888'}}><span>{k}</span><span>{fmt(v)}</span></div>
             ))}
@@ -461,42 +725,107 @@ function FlowTab({ project }) {
 }
 
 /* ══════════════════════════════════════════
-   WORK ITEMS TAB
+   WORK ITEMS TAB（含成本欄）
 ══════════════════════════════════════════ */
 function WorkTab({ project }) {
   const [cats, setCats] = useDB('wcats_'+project.id, []);
   const [items, setItems] = useDB('witems_'+project.id, []);
   const [showAddCat, setShowAddCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [newCatTemplate, setNewCatTemplate] = useState('');
   const [collapsed, setCollapsed] = useState({});
+  const [showCost, setShowCost] = useState(false); // Internal cost toggle
 
-  const catTotal = cid => items.filter(i=>i.category_id===cid).reduce((s,i)=>s+i.unit_price*i.quantity,0);
-  const grand = cats.reduce((s,c)=>s+catTotal(c.id),0);
+  const catTotal     = cid => items.filter(i=>i.category_id===cid).reduce((s,i)=>s+i.unit_price*i.quantity,0);
+  const catCost      = cid => items.filter(i=>i.category_id===cid).reduce((s,i)=>s+(i.cost_price||0)*i.quantity,0);
+  const grand        = cats.reduce((s,c)=>s+catTotal(c.id),0);
+  const grandCost    = cats.reduce((s,c)=>s+catCost(c.id),0);
+  const grandProfit  = grand - grandCost;
+  const profitPct    = grand ? Math.round(grandProfit/grand*100) : 0;
 
   const addCat = () => {
     if (!newCatName.trim()) return;
-    setCats(p=>[...p,{id:nid(),name:newCatName.trim(),sort_order:p.length}]);
-    setNewCatName(''); setShowAddCat(false); toast('已新增大項');
+    const id = nid();
+    setCats(p=>[...p,{id,name:newCatName.trim(),sort_order:p.length}]);
+    // If a template was chosen, pre-populate items
+    if (newCatTemplate) {
+      const tpl = QUOTE_TEMPLATES.find(t=>t.name===newCatTemplate);
+      if (tpl) {
+        const newItems = tpl.items.map((name,idx)=>({
+          id:nid(), category_id:id, name, unit:'式', quantity:1,
+          unit_price:0, cost_price:0, notes:'', sort_order:idx
+        }));
+        setItems(p=>[...p,...newItems]);
+      }
+    }
+    setNewCatName(''); setNewCatTemplate(''); setShowAddCat(false);
+    toast('已新增大項' + (newCatTemplate ? '（含預設細項）' : ''));
   };
-  const delCat = id => { if(!confirm('確認刪除此大項及所有細項？')) return; setCats(p=>p.filter(c=>c.id!==id)); setItems(p=>p.filter(i=>i.category_id!==id)); };
-  const addItem = cid => setItems(p=>[...p,{id:nid(),category_id:cid,name:'新細項',unit:'式',quantity:1,unit_price:0,notes:'',sort_order:p.filter(i=>i.category_id===cid).length}]);
+
+  const delCat = id => { if(!confirm('確認刪除此大項及所有細項？'))return; setCats(p=>p.filter(c=>c.id!==id)); setItems(p=>p.filter(i=>i.category_id!==id)); };
+  const addItem = cid => setItems(p=>[...p,{id:nid(),category_id:cid,name:'',unit:'式',quantity:1,unit_price:0,cost_price:0,notes:'',sort_order:p.filter(i=>i.category_id===cid).length}]);
   const updItem = (id,f,v) => setItems(p=>p.map(i=>i.id===id?{...i,[f]:v}:i));
   const delItem = id => setItems(p=>p.filter(i=>i.id!==id));
 
+  // Name dropdown for quick fill
+  const NameCell = ({ item, catId }) => {
+    const [open, setOpen] = useState(false);
+    const tpl = QUOTE_TEMPLATES.find(t=>cats.find(c=>c.id===catId)?.name?.includes(t.name.slice(0,4)));
+    const suggestions = tpl ? tpl.items.filter(s=>!items.find(i=>i.category_id===catId&&i.name===s)) : [];
+    return (
+      <div style={{position:'relative'}}>
+        <div style={{display:'flex',alignItems:'center',gap:4}}>
+          <IE value={item.name} onChange={v=>updItem(item.id,'name',v)} placeholder="細項名稱" style={{flex:1}}/>
+          {suggestions.length>0&&(
+            <button onClick={()=>setOpen(o=>!o)} style={{background:'none',border:'1px solid #D4D4CE',borderRadius:4,padding:'1px 5px',fontSize:11,color:'#AAA',cursor:'pointer',flexShrink:0}} title="快速選項">▾</button>
+          )}
+        </div>
+        {open&&suggestions.length>0&&(
+          <div style={{position:'absolute',top:'100%',left:0,zIndex:100,background:'#fff',border:'1px solid #D4D4CE',borderRadius:6,boxShadow:'0 4px 16px rgba(0,0,0,.12)',minWidth:220,maxHeight:200,overflowY:'auto'}}>
+            {suggestions.map(s=>(
+              <div key={s} onClick={()=>{updItem(item.id,'name',s);setOpen(false);}}
+                style={{padding:'7px 12px',fontSize:12,cursor:'pointer',borderBottom:'1px solid #F4F4F0',color:'#333'}}
+                onMouseOver={e=>e.currentTarget.style.background='#F8F4EC'}
+                onMouseOut={e=>e.currentTarget.style.background='#fff'}>
+                {s}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const exportXlsx = () => {
     const wb = XLSX.utils.book_new();
-    const rows = [];
+    // Client sheet (no cost)
+    const clientRows = [];
     cats.forEach((cat,ci)=>{
-      rows.push({'項次':String.fromCharCode(65+ci),'細項名稱':cat.name,'單位':'','數量':'','單價':'','總計':'','備註':''});
+      clientRows.push({'項次':String.fromCharCode(65+ci),'細項名稱':cat.name,'單位':'','數量':'','報價單價':'','報價總計':'','備註':''});
       items.filter(i=>i.category_id===cat.id).forEach((it,ii)=>{
-        rows.push({'項次':ii+1,'細項名稱':it.name,'單位':it.unit,'數量':it.quantity,'單價':it.unit_price,'總計':it.unit_price*it.quantity,'備註':it.notes||''});
+        clientRows.push({'項次':ii+1,'細項名稱':it.name,'單位':it.unit,'數量':it.quantity,'報價單價':it.unit_price,'報價總計':it.unit_price*it.quantity,'備註':it.notes||''});
       });
-      rows.push({'項次':'','細項名稱':'小計','單位':'','數量':'','單價':'','總計':catTotal(cat.id),'備註':''});
-      rows.push({});
+      clientRows.push({'項次':'','細項名稱':'小計','單位':'','數量':'','報價單價':'','報價總計':catTotal(cat.id),'備註':''});
+      clientRows.push({});
     });
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols']=[{wch:6},{wch:36},{wch:6},{wch:6},{wch:10},{wch:12},{wch:20}];
-    XLSX.utils.book_append_sheet(wb, ws, '工程明細');
+    const ws1 = XLSX.utils.json_to_sheet(clientRows);
+    ws1['!cols']=[{wch:6},{wch:36},{wch:6},{wch:6},{wch:10},{wch:12},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws1, '工程報價（客戶版）');
+    // Internal sheet (with cost)
+    const internalRows = [];
+    cats.forEach((cat,ci)=>{
+      internalRows.push({'項次':String.fromCharCode(65+ci),'細項名稱':cat.name,'單位':'','數量':'','報價單價':'','報價總計':'','成本單價':'','成本總計':'','毛利':'','備註':''});
+      items.filter(i=>i.category_id===cat.id).forEach((it,ii)=>{
+        const rev=it.unit_price*it.quantity, cost=(it.cost_price||0)*it.quantity;
+        internalRows.push({'項次':ii+1,'細項名稱':it.name,'單位':it.unit,'數量':it.quantity,'報價單價':it.unit_price,'報價總計':rev,'成本單價':it.cost_price||0,'成本總計':cost,'毛利':rev-cost,'備註':it.notes||''});
+      });
+      const tc=catTotal(cat.id),cc=catCost(cat.id);
+      internalRows.push({'項次':'','細項名稱':'小計','單位':'','數量':'','報價單價':'','報價總計':tc,'成本單價':'','成本總計':cc,'毛利':tc-cc,'備註':''});
+      internalRows.push({});
+    });
+    const ws2 = XLSX.utils.json_to_sheet(internalRows);
+    ws2['!cols']=[{wch:6},{wch:36},{wch:6},{wch:6},{wch:10},{wch:12},{wch:10},{wch:12},{wch:10},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws2, '工程成本（內部）');
     XLSX.writeFile(wb, project.name+'_工程明細.xlsx');
   };
 
@@ -504,61 +833,144 @@ function WorkTab({ project }) {
     <div>
       <div className="section-header">
         <div className="section-title">工程明細</div>
-        <div style={{display:'flex',gap:8}}>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          {/* Internal cost toggle */}
+          <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:12,color:showCost?'#8B2E2E':'#AAA',background:showCost?'#FFF0F0':'#F8F8F4',border:'1px solid '+(showCost?'#EEC0C0':'#E4E4DC'),borderRadius:6,padding:'5px 10px',userSelect:'none',fontWeight:500}}>
+            <input type="checkbox" checked={showCost} onChange={e=>setShowCost(e.target.checked)} style={{accentColor:'#8B2E2E'}}/>
+            🔒 顯示成本（內部）
+          </label>
           <button className="btn btn-ghost btn-sm" onClick={exportXlsx}>匯出 Excel</button>
           <button className="btn btn-primary btn-sm" onClick={()=>setShowAddCat(true)}>＋ 新增大項</button>
         </div>
       </div>
 
+      {/* Profit summary (only when cost visible) */}
+      {showCost&&(
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16,padding:'12px 16px',background:'#FFF8F4',border:'1px solid #EEC0C0',borderRadius:8}}>
+          <div><div style={{fontSize:11,color:'#888'}}>報價總計</div><div style={{fontSize:16,fontWeight:700,color:'#1A1A18'}}>{fmt(grand)}</div></div>
+          <div><div style={{fontSize:11,color:'#888'}}>成本總計</div><div style={{fontSize:16,fontWeight:700,color:'#8B2E2E'}}>{fmt(grandCost)}</div></div>
+          <div><div style={{fontSize:11,color:'#888'}}>毛利</div><div style={{fontSize:16,fontWeight:700,color:'#3A5240'}}>{fmt(grandProfit)}</div></div>
+          <div><div style={{fontSize:11,color:'#888'}}>毛利率</div><div style={{fontSize:16,fontWeight:700,color:profitPct>=30?'#3A5240':profitPct>=15?'#C8A96E':'#8B2E2E'}}>{profitPct}%</div></div>
+        </div>
+      )}
+
       {cats.map((cat,ci)=>{
         const citems = items.filter(i=>i.category_id===cat.id);
+        const tc = catTotal(cat.id), cc = catCost(cat.id);
         return (
-          <div key={cat.id}>
+          <div key={cat.id} style={{marginBottom:18}}>
             <div className="cat-header">
-              <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}} onClick={()=>setCollapsed(p=>({...p,[cat.id]:!p[cat.id]}))}>
-                <span style={{color:'#888',fontSize:12}}>{String.fromCharCode(65+ci)}.</span>
+              <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1}} onClick={()=>setCollapsed(p=>({...p,[cat.id]:!p[cat.id]}))}>
+                <span style={{color:'#888',fontSize:12,flexShrink:0}}>{String.fromCharCode(65+ci)}.</span>
                 <span>{cat.name}</span>
-                <span style={{fontSize:12,color:'#C8A96E',marginLeft:8,fontWeight:400}}>小計：{fmt(catTotal(cat.id))}</span>
+                <span style={{fontSize:12,color:'#C8A96E',marginLeft:8,fontWeight:400}}>報價：{fmt(tc)}</span>
+                {showCost&&<span style={{fontSize:11,color:'#8B2E2E',marginLeft:4}}>成本：{fmt(cc)}</span>}
+                {showCost&&tc>0&&<span style={{fontSize:11,color:'#3A5240',background:'#E8F4EC',padding:'1px 6px',borderRadius:10}}>利潤 {tc?Math.round((tc-cc)/tc*100):0}%</span>}
               </div>
-              <div style={{display:'flex',gap:6}}>
+              <div style={{display:'flex',gap:6,flexShrink:0}}>
                 <button className="btn btn-ghost btn-xs" onClick={()=>addItem(cat.id)}>＋ 新增細項</button>
                 <button className="btn btn-xs" style={{background:'#FFF0F0',color:'#8B2E2E',border:'1px solid #EEC0C0',borderRadius:4,padding:'3px 8px'}} onClick={()=>delCat(cat.id)}>刪除</button>
-                <span style={{color:'#AAA',fontSize:13,cursor:'pointer'}} onClick={()=>setCollapsed(p=>({...p,[cat.id]:!p[cat.id]}))}>{collapsed[cat.id]?'▲':'▼'}</span>
+                <span style={{color:'#AAA',fontSize:13,cursor:'pointer'}} onClick={()=>setCollapsed(p=>({...p,[cat.id]:!p[cat.id]}))}>
+                  {collapsed[cat.id]?'▲':'▼'}
+                </span>
               </div>
             </div>
+
             {!collapsed[cat.id]&&(
-              <div className="cat-body">
-                <table>
-                  <thead><tr><th>細項名稱</th><th style={{width:55}}>單位</th><th className="num" style={{width:65}}>數量</th><th className="num" style={{width:92}}>報價單價</th><th className="num" style={{width:105}}>報價總計</th><th>備註</th><th style={{width:42}}></th></tr></thead>
+              <div className="cat-body" style={{overflowX:'auto'}}>
+                <table style={{minWidth:showCost?820:600}}>
+                  <thead><tr>
+                    <th style={{minWidth:200}}>細項名稱</th>
+                    <th style={{width:55}}>單位</th>
+                    <th className="num" style={{width:65}}>數量</th>
+                    <th className="num" style={{width:90}}>報價單價</th>
+                    <th className="num" style={{width:105}}>報價總計</th>
+                    {showCost&&<th className="num" style={{width:90,background:'#FFF5F5',color:'#8B2E2E'}}>成本單價</th>}
+                    {showCost&&<th className="num" style={{width:90,background:'#FFF5F5',color:'#8B2E2E'}}>毛利</th>}
+                    <th style={{minWidth:80}}>備註</th>
+                    <th style={{width:32}}></th>
+                  </tr></thead>
                   <tbody>
-                    {citems.map(it=>(
-                      <tr key={it.id}>
-                        <td><IE value={it.name} onChange={v=>updItem(it.id,'name',v)}/></td>
-                        <td><IE value={it.unit} style={{width:44,textAlign:'center'}} onChange={v=>updItem(it.id,'unit',v)}/></td>
-                        <td className="num"><IE value={it.quantity} type="number" style={{width:54,textAlign:'right'}} onChange={v=>updItem(it.id,'quantity',+v)}/></td>
-                        <td className="num"><IE value={it.unit_price} type="number" style={{width:78,textAlign:'right'}} onChange={v=>updItem(it.id,'unit_price',+v)}/></td>
-                        <td className="num" style={{fontWeight:500}}>{fmt(it.unit_price*it.quantity)}</td>
-                        <td><IE value={it.notes||''} placeholder="備註" onChange={v=>updItem(it.id,'notes',v)}/></td>
-                        <td style={{textAlign:'center'}}><button className="btn-icon" style={{color:'#DDD'}} onClick={()=>delItem(it.id)}>✕</button></td>
-                      </tr>
-                    ))}
-                    {!citems.length&&<tr><td colSpan={7} style={{textAlign:'center',color:'#CCC',fontSize:12,padding:14}}>（尚無細項，點右上角 ＋ 新增）</td></tr>}
+                    {citems.map(it=>{
+                      const rev=it.unit_price*it.quantity, cost=(it.cost_price||0)*it.quantity;
+                      return (
+                        <tr key={it.id}>
+                          <td><NameCell item={it} catId={cat.id}/></td>
+                          <td>
+                            <select value={it.unit||'式'} onChange={e=>updItem(it.id,'unit',e.target.value)}
+                              style={{border:'none',background:'transparent',fontSize:12,color:'#555',cursor:'pointer',width:'100%',outline:'none'}}>
+                              {WORK_UNITS.map(u=><option key={u}>{u}</option>)}
+                            </select>
+                          </td>
+                          <td className="num"><IE value={it.quantity} type="number" style={{width:54,textAlign:'right'}} onChange={v=>updItem(it.id,'quantity',+v)}/></td>
+                          <td className="num"><IE value={it.unit_price} type="number" style={{width:78,textAlign:'right'}} onChange={v=>updItem(it.id,'unit_price',+v)}/></td>
+                          <td className="num" style={{fontWeight:500}}>{fmt(rev)}</td>
+                          {showCost&&<td className="num" style={{background:'#FFFAF8'}}>
+                            <IE value={it.cost_price||0} type="number" style={{width:78,textAlign:'right',color:'#8B2E2E'}} onChange={v=>updItem(it.id,'cost_price',+v)}/>
+                          </td>}
+                          {showCost&&<td className="num" style={{background:'#FFFAF8',fontSize:12,fontWeight:600,color:rev-cost>0?'#3A5240':'#8B2E2E'}}>{fmt(rev-cost)}</td>}
+                          <td><IE value={it.notes||''} placeholder="備註" onChange={v=>updItem(it.id,'notes',v)}/></td>
+                          <td style={{textAlign:'center'}}><button className="btn-icon" style={{color:'#DDD'}} onClick={()=>delItem(it.id)}>✕</button></td>
+                        </tr>
+                      );
+                    })}
+                    {!citems.length&&<tr><td colSpan={showCost?9:7} style={{textAlign:'center',color:'#CCC',fontSize:12,padding:14}}>（尚無細項，點右上角 ＋ 新增，或建立大項時選範本自動帶入）</td></tr>}
                   </tbody>
                 </table>
-                <div className="cat-subtotal">小計：{fmt(catTotal(cat.id))}</div>
+                <div className="cat-subtotal" style={{display:'flex',justifyContent:'flex-end',gap:20}}>
+                  <span>報價小計：{fmt(tc)}</span>
+                  {showCost&&<span style={{color:'#8B2E2E'}}>成本：{fmt(cc)}</span>}
+                  {showCost&&<span style={{color:'#3A5240'}}>毛利：{fmt(tc-cc)}（{tc?Math.round((tc-cc)/tc*100):0}%）</span>}
+                </div>
               </div>
             )}
           </div>
         );
       })}
-      {!cats.length&&<div style={{textAlign:'center',padding:40,color:'#CCC',fontSize:13}}>尚無工程大項，請點「新增大項」建立</div>}
-      <div style={{textAlign:'right',padding:'14px 0',fontSize:16,fontWeight:700,borderTop:'2px solid #1A1A18',marginTop:4}}>
-        工程總計：<span style={{color:'#C8A96E'}}>{fmt(grand)}</span>
-      </div>
 
+      {!cats.length&&(
+        <div style={{textAlign:'center',padding:'40px 20px',color:'#CCC',fontSize:13}}>
+          <div style={{fontSize:36,marginBottom:12}}>📋</div>
+          <div style={{marginBottom:16}}>尚無工程大項</div>
+          <button className="btn btn-gold" onClick={()=>setShowAddCat(true)}>＋ 新增第一個大項</button>
+        </div>
+      )}
+
+      {cats.length>0&&(
+        <div style={{textAlign:'right',padding:'14px 0',borderTop:'2px solid #1A1A18',marginTop:4,display:'flex',justifyContent:'flex-end',gap:24,flexWrap:'wrap'}}>
+          <span style={{fontSize:16,fontWeight:700}}>工程總計：<span style={{color:'#C8A96E'}}>{fmt(grand)}</span></span>
+          {showCost&&<span style={{fontSize:14,fontWeight:600,color:'#8B2E2E'}}>成本：{fmt(grandCost)}</span>}
+          {showCost&&<span style={{fontSize:14,fontWeight:600,color:'#3A5240'}}>毛利：{fmt(grandProfit)}（{profitPct}%）</span>}
+        </div>
+      )}
+
+      {/* Add Category Modal */}
       <Modal open={showAddCat} title="新增工程大項" onClose={()=>setShowAddCat(false)}
         footer={<><button className="btn btn-ghost" onClick={()=>setShowAddCat(false)}>取消</button><button className="btn btn-primary" onClick={addCat}>新增</button></>}>
-        <div className="form-group"><label className="form-label">大項名稱 *</label><IInput value={newCatName} onChange={setNewCatName} placeholder="例：木作工程"/></div>
+        <div className="form-group">
+          <label className="form-label">大項名稱 *</label>
+          <IInput value={newCatName} onChange={setNewCatName} placeholder="例：木作工程"/>
+        </div>
+        <div className="form-group">
+          <label className="form-label">套用估價單範本（可選）</label>
+          <select className="form-select" value={newCatTemplate} onChange={e=>{
+            setNewCatTemplate(e.target.value);
+            if(e.target.value && !newCatName) setNewCatName(e.target.value);
+          }}>
+            <option value="">不套用範本，手動新增細項</option>
+            {QUOTE_TEMPLATES.map(t=>(
+              <option key={t.name} value={t.name}>{t.name}（{t.items.length} 個預設細項）</option>
+            ))}
+          </select>
+        </div>
+        {newCatTemplate&&(
+          <div style={{background:'#F8F8F4',border:'1px solid #E4E4DC',borderRadius:6,padding:'10px 14px'}}>
+            <div style={{fontSize:11,color:'#888',marginBottom:6,fontWeight:600}}>將自動新增以下細項：</div>
+            {QUOTE_TEMPLATES.find(t=>t.name===newCatTemplate)?.items.map(item=>(
+              <div key={item} style={{fontSize:12,color:'#555',padding:'2px 0'}}>• {item}</div>
+            ))}
+          </div>
+        )}
       </Modal>
     </div>
   );
@@ -965,10 +1377,185 @@ function MeetingTab({ project }) {
 }
 
 /* ══════════════════════════════════════════
+   FOLDERS TAB
+══════════════════════════════════════════ */
+function FoldersTab({ project }) {
+  const [folders, setFolders] = useDB('folders_'+project.id, () => {
+    // 若尚未初始化，現在產生
+    const f = DEFAULT_FOLDERS.map(f=>({
+      id: nid(), project_id: project.id, code: f.code, name: f.name, en: f.en,
+      icon: f.icon, color: f.color, is_root: true, notes: '',
+      children: f.children.map(c=>({id: nid(), code: c.code, name: c.name, desc: c.desc, notes: ''}))
+    }));
+    return f;
+  });
+
+  const [openFolder, setOpenFolder] = useState(null); // root folder id
+  const [openSub, setOpenSub] = useState(null);       // sub folder id
+  const [editNotes, setEditNotes] = useState({});
+  const [showAddSub, setShowAddSub] = useState(null);
+  const [newSubName, setNewSubName] = useState('');
+
+  const toggleRoot = id => { setOpenFolder(p=>p===id?null:id); setOpenSub(null); };
+  const toggleSub  = id => setOpenSub(p=>p===id?null:id);
+
+  const updRootNotes = (fid, val) => setFolders(p=>p.map(f=>f.id===fid?{...f,notes:val}:f));
+  const updSubNotes  = (fid, sid, val) => setFolders(p=>p.map(f=>f.id===fid?{...f,children:f.children.map(c=>c.id===sid?{...c,notes:val}:c)}:f));
+
+  const addSub = fid => {
+    if (!newSubName.trim()) return;
+    const code = String(folders.find(f=>f.id===fid)?.children.length||0).padStart(2,'0');
+    setFolders(p=>p.map(f=>f.id===fid?{...f,children:[...f.children,{id:nid(),code,name:newSubName.trim(),desc:'',notes:''}]}:f));
+    setNewSubName(''); setShowAddSub(null); toast('已新增子資料夾');
+  };
+  const delSub = (fid,sid) => { if(!confirm('確定刪除此子資料夾？'))return; setFolders(p=>p.map(f=>f.id===fid?{...f,children:f.children.filter(c=>c.id!==sid)}:f)); };
+
+  const fullPath = (f, c) => `${f.code}_${f.name} / ${c.code}_${c.name}`;
+
+  return (
+    <div>
+      <div className="section-header">
+        <div>
+          <div className="section-title">📁 專案資料夾架構</div>
+          <div style={{fontSize:12,color:'#888',marginTop:3}}>標準目錄 · 點擊展開各資料夾</div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={()=>{
+          if(!confirm('重設為預設資料夾架構？（自訂內容將保留，僅補充缺少的項目）'))return;
+          setFolders(DEFAULT_FOLDERS.map(f=>({
+            id:nid(),project_id:project.id,code:f.code,name:f.name,en:f.en,
+            icon:f.icon,color:f.color,is_root:true,notes:'',
+            children:f.children.map(c=>({id:nid(),code:c.code,name:c.name,desc:c.desc,notes:''}))
+          }))); toast('已重設為預設架構');
+        }}>重設預設</button>
+      </div>
+
+      {/* Overview strip */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>
+        {folders.map(f=>(
+          <div key={f.id} onClick={()=>toggleRoot(f.id)} style={{
+            display:'flex',alignItems:'center',gap:6,padding:'6px 12px',borderRadius:20,cursor:'pointer',
+            background:openFolder===f.id?f.color:'#fff',
+            color:openFolder===f.id?'#fff':'#444',
+            border:'1.5px solid '+(openFolder===f.id?f.color:'#E4E4DC'),
+            fontSize:12,fontWeight:500,transition:'all .15s',userSelect:'none'
+          }}>
+            <span>{f.icon}</span>
+            <span>{f.code}_{f.name}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Folder cards */}
+      {folders.map(folder=>(
+        <div key={folder.id} style={{marginBottom:12,borderRadius:10,overflow:'hidden',border:'1.5px solid '+(openFolder===folder.id?folder.color:'#E4E4DC'),transition:'border .2s'}}>
+          {/* Root header */}
+          <div onClick={()=>toggleRoot(folder.id)} style={{
+            display:'flex',alignItems:'center',gap:12,padding:'13px 18px',cursor:'pointer',
+            background:openFolder===folder.id?folder.color+'18':'#F8F8F4',
+            borderBottom:openFolder===folder.id?'1.5px solid '+folder.color+'33':'none',
+            userSelect:'none'
+          }}>
+            <span style={{fontSize:22,flexShrink:0}}>{folder.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+                <span style={{fontWeight:700,fontSize:14,color:'#1A1A18'}}>{folder.code}_{folder.name}</span>
+                <span style={{fontSize:11,color:'#AAA',fontStyle:'italic'}}>{folder.en}</span>
+              </div>
+              <div style={{fontSize:11,color:'#AAA',marginTop:2}}>{folder.children.length} 個子資料夾</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:6,height:6,borderRadius:'50%',background:folder.color}}/>
+              <span style={{color:'#AAA',fontSize:13}}>{openFolder===folder.id?'▲':'▼'}</span>
+            </div>
+          </div>
+
+          {/* Sub folders */}
+          {openFolder===folder.id&&(
+            <div style={{background:'#fff'}}>
+              {/* Root notes */}
+              <div style={{padding:'10px 18px',borderBottom:'1px solid #F4F4EE'}}>
+                <div style={{fontSize:11,color:'#AAA',marginBottom:4}}>大項備註</div>
+                <ITextarea value={folder.notes||''} onChange={v=>updRootNotes(folder.id,v)}
+                  placeholder="此資料夾的整體備註、狀態或說明..."
+                  style={{minHeight:40,fontSize:12,color:'#555',background:'#FAFAF6'}}/>
+              </div>
+
+              {folder.children.map((sub,si)=>(
+                <div key={sub.id} style={{borderBottom:'1px solid #F4F4EE'}}>
+                  {/* Sub header */}
+                  <div onClick={()=>toggleSub(sub.id)} style={{
+                    display:'flex',alignItems:'center',gap:10,padding:'10px 18px 10px 28px',
+                    cursor:'pointer',background:openSub===sub.id?'#FAFAF6':'#fff',userSelect:'none'
+                  }}>
+                    <span style={{fontSize:13,color:folder.color,fontWeight:700,width:28,flexShrink:0}}>
+                      {folder.code}{sub.code}
+                    </span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,color:'#1A1A18'}}>{sub.name}</div>
+                      {sub.desc&&<div style={{fontSize:11,color:'#AAA',marginTop:1}}>{sub.desc}</div>}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      {sub.notes&&<span style={{fontSize:10,color:'#C8A96E',background:'#FBF0DC',padding:'2px 7px',borderRadius:10}}>有備註</span>}
+                      <button onClick={e=>{e.stopPropagation();delSub(folder.id,sub.id);}} style={{background:'none',border:'none',color:'#E0E0D8',cursor:'pointer',fontSize:12,padding:'2px 4px'}} title="刪除">✕</button>
+                      <span style={{color:'#CCC',fontSize:12}}>{openSub===sub.id?'▲':'▼'}</span>
+                    </div>
+                  </div>
+
+                  {/* Sub notes */}
+                  {openSub===sub.id&&(
+                    <div style={{padding:'10px 18px 14px 56px',background:'#FAFAF6'}}>
+                      <div style={{fontSize:11,color:'#AAA',marginBottom:4}}>
+                        📂 完整路徑：{fullPath(folder,sub)}
+                      </div>
+                      <ITextarea value={sub.notes||''} onChange={v=>updSubNotes(folder.id,sub.id,v)}
+                        placeholder="此子資料夾的備註、進度或連結說明..."
+                        style={{minHeight:50,fontSize:12,color:'#555'}}/>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Add sub folder */}
+              {showAddSub===folder.id ? (
+                <div style={{padding:'12px 18px',background:'#F8F8F4',borderTop:'1px dashed #E4E4DC',display:'flex',gap:8}}>
+                  <IInput value={newSubName} onChange={setNewSubName} placeholder="新子資料夾名稱..."
+                    style={{flex:1,fontSize:13}}/>
+                  <button className="btn btn-primary btn-sm" onClick={()=>addSub(folder.id)}>新增</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setShowAddSub(null)}>取消</button>
+                </div>
+              ):(
+                <div style={{padding:'8px 18px',borderTop:'1px dashed #EAEAE4'}}>
+                  <button onClick={()=>{setShowAddSub(folder.id);setNewSubName('');}}
+                    style={{border:'none',background:'none',color:'#C8A96E',fontSize:12,cursor:'pointer',padding:'2px 0',fontWeight:500}}>
+                    ＋ 新增子資料夾
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Legend */}
+      <div style={{marginTop:20,padding:'14px 18px',background:'#F8F8F4',borderRadius:8,border:'1px dashed #E4E4DC'}}>
+        <div style={{fontSize:12,fontWeight:600,color:'#555',marginBottom:8}}>📌 使用說明</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,fontSize:12,color:'#888'}}>
+          <span>• 點擊上方標籤快速跳至對應資料夾</span>
+          <span>• 點擊子資料夾可展開填寫備註</span>
+          <span>• 每個資料夾可記錄狀態與說明</span>
+          <span>• 可新增或刪除子資料夾</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    PROJECT DETAIL
 ══════════════════════════════════════════ */
 const PROJ_TABS = [
   {key:'summary',label:'專案總覽'},{key:'flow',label:'專案流程'},
+  {key:'folders',label:'📁 資料夾'},
   {key:'work',label:'工程明細'},{key:'purchase',label:'採購明細'},
   {key:'schedule',label:'進度排程'},{key:'payment',label:'付款管理'},
   {key:'todos',label:'待辦事項'},{key:'sitelog',label:'施工日誌'},
@@ -981,6 +1568,7 @@ function ProjectDetail({ project, onUpdate, onBack }) {
   const content = useMemo(()=>{
     if(tab==='summary')  return <SummaryTab project={project} onUpdate={onUpdate}/>;
     if(tab==='flow')     return <FlowTab project={project}/>;
+    if(tab==='folders')  return <FoldersTab project={project}/>;
     if(tab==='work')     return <WorkTab project={project}/>;
     if(tab==='purchase') return <PurchaseTab project={project}/>;
     if(tab==='schedule') return <ScheduleTab project={project}/>;
@@ -999,6 +1587,7 @@ function ProjectDetail({ project, onUpdate, onBack }) {
         </div>
         <span className={`badge ${STATUS_BADGE[project.status]||'badge-active'}`} style={{flexShrink:0}}>{STATUS_LABEL[project.status]||'進行中'}</span>
         {todos.length>0&&<span style={{fontSize:12,color:'#8B2E2E',flexShrink:0}}>⚠ {todos.length} 待辦</span>}
+        <SyncButton projectId={project.id}/>
         <button className="btn btn-ghost btn-sm" onClick={onBack}>← 返回</button>
       </div>
       <div className="tab-bar">{PROJ_TABS.map(t=><div key={t.key} className={`tab-item ${tab===t.key?'active':''}`} onClick={()=>setTab(t.key)}>{t.label}</div>)}</div>
@@ -1010,6 +1599,156 @@ function ProjectDetail({ project, onUpdate, onBack }) {
 /* ══════════════════════════════════════════
    PROJECT LIST
 ══════════════════════════════════════════ */
+/* 標準資料夾架構 */
+/* ══ 估價單預設大項與細項模板 ══ */
+const QUOTE_TEMPLATES = [
+  { name:'前置／拆除工程', items:[
+    '既有木作櫃體拆除','玻璃隔間拆除','磁磚打除見底',
+    '廢棄物搬運（小工）','廢棄物運棄處理','完工後廢棄物清運',
+    '糞管移位','裝修送審','公共區域保護','損傷修補','完工清潔','粗清',
+  ]},
+  { name:'水電／弱電工程', items:[
+    '室內給水更新項目','廚房110V電源迴路（2.0平方）','室內機配線按裝工事',
+    '控制線配置','空調專用迴路','220V迴路','電源延伸',
+    '無熔絲開關更換','切斷開關','60A電箱更換','動力電箱整線',
+    '1吋影音空管路預埋（PVC管）','網路弱電配線','出線（含盒子）',
+    '洗孔','PE無菌管材料費','鍍鋅豪華型安裝架','冷水出口配置',
+    '客廳地板插座','消防感知器','燈控感知器配線','迴路追加',
+  ]},
+  { name:'空調設備工程', items:[
+    '大金埋入型清淨機（FDXV60RVLT）','變頻冷暖吊隱式（1對2）',
+    '國際變頻冷暖1對1','室內外機排水工程','除濕機工事','除濕機風管配置',
+    '線型集風箱（含遮蓋）','出回風口配置','無框出風口（塑料ABS固定式）',
+    '上項變壓器','管幹管','可繞式保溫管','修飾管槽','設備工程安裝工事',
+  ]},
+  { name:'泥作工程', items:[
+    '磚牆雙面粉光','立面隔間牆','泥作打底','貼磚工資（平鋪）',
+    '半高貼磚','填縫劑施作','地面細粒環氧彩砂','浴缸基座',
+    '埋壁式淋浴門框','簡易防水（彈性水泥）','次浴地坪工程',
+    '泥作收邊','區隔條收邊','交接處企口脫溝','洗孔',
+  ]},
+  { name:'木作工程', items:[
+    '客餐廳天花板平釘','隱藏式窗簾盒批土研磨噴漆','全室壁面批土研磨',
+    '玄關鞋櫃','電器櫃','儲物櫃','折門衣櫃','書桌','電視平台',
+    '造型廚房下櫃（美背）','床頭壁板','身穿衣鏡',
+    '實木桌板（贈送）','冰箱側邊收納','內部層架',
+    '可調色溫層板燈盒','滑軌抽屜','五金配件','造型板','櫃體工程',
+    '廁所地坪保護','門片','木框','收邊','板維修',
+  ]},
+  { name:'油漆工程', items:[
+    '全室礦物漆專用底漆','全室礦物漆','全室壁面重新粉刷',
+    '反間接照明批土研磨噴漆','批土打磨噴漆（造型）',
+    '新作門片與門框噴漆','含AB膠批土打磨一底二面漆',
+    '臥室門面貼木皮','木皮門片研磨噴漆','面貼微鋼刷木皮染色',
+    '可調色溫層板燈安裝','改色費用','細節收尾',
+  ]},
+  { name:'地板工程', items:[
+    '超耐磨木地板施作','地毯+益膠泥施作',
+    '客廳磁磚採購','主臥60x60磁磚採購','貼磚工資','磁磚打除見底',
+    '區貼半高牆面','托倫石紋磚CNG660781','托斯卡尼水磨石TVC660021',
+    '廚房地坪','地坪工程清運',
+  ]},
+  { name:'玻璃工程', items:[
+    '一字型淋浴玻璃門組','向側移門淋浴門組','強化玻璃門片',
+    '客廳弧形玻璃','鋁製無框玻璃','光邊加工處理','光邊長度計費',
+    '鏡面訂製','浴室優白明鏡','運送安裝費',
+  ]},
+  { name:'燈具設備', items:[
+    '櫃下調光鋁殼燈安裝','5W GU10崁燈（4000K）','LED可調色溫層板燈',
+    'LED GU10可調色（9W）','LED層板燈','Lutron Caseta智能燈具控制組',
+    'Lutron Caseta面板模組','照明迴路配置','燈控感知器','燈泡（暫估）',
+  ]},
+  { name:'門窗工程', items:[
+    '客廳鋁窗（太天8mm清玻）','房門強化','氣密門',
+    '門片更換','門框修繕','鋁窗修繕',
+  ]},
+  { name:'檯面／鐵件', items:[
+    '沛石L型流理台檯面','74cm Franke Maris不鏽鋼水槽',
+    '國產人造石咖啡桌面','磁吸琺瑯板','優白烤漆台面',
+    '訂製洗手台面','鐵件OC-31材料費','幽靈滑軌',
+    '走廊微剛刷鐵件','門檻收邊','立面鐵件',
+  ]},
+  { name:'採購工程（實報實銷）', items:[
+    'INAX分體馬桶 AC-832VN-TW','TOTO浴缸出水','室下崁盆 LW1516TW',
+    'Grohe Essence SmartControl淋浴溫控龍頭','淋浴蓮蓬頭架',
+    'DURAVIT右斜上崁壓克力浴缸160cm','壓克力浴缸',
+    '主浴室一體檯面盆','次浴室一體檯面盆',
+    '浴室換氣暖風機 TYB3151AAR','Leviton插座組',
+    '按鍵式廚房龍頭（可伸縮）','BOSCH排油煙機','櫻花80公分全隱藏式排油煙機',
+    'BOSCH IH爐 PPI82560TW','雙口檯面爐',
+    '不鏽鋼水槽 74cm Franke Maris W07019',
+    'Lutron Caseta燈具控制組','捲軸式紗門紗窗',
+    '浴室訂製洗手櫃','實木餐桌','俄羅斯落葉松夾板（贈送）',
+    'LED崁燈','BLUM五金',
+  ]},
+];
+
+const WORK_UNITS = ['式','坪','才','m²','m','組','台','個','批','次','項','套','支','片','桶','箱'];
+
+const DEFAULT_FOLDERS = [
+  { code:'00', name:'行政與合約', en:'Admin & Contracts', icon:'📋', color:'#6B7FC4', children:[
+    { code:'01', name:'合約書', desc:'設計約、工程約、變更追加減確認單' },
+    { code:'02', name:'客戶資料', desc:'客戶需求訪談紀錄、聯絡資訊' },
+    { code:'03', name:'請款與發票', desc:'各階段請款單、收據影本' },
+    { code:'04', name:'管委會文件', desc:'室內裝修審查申請、施工許可證、大樓施工規範' },
+  ]},
+  { code:'01', name:'基地勘察與現況', en:'Site Survey & Existing Conditions', icon:'🔍', color:'#6BAA8A', children:[
+    { code:'01', name:'現況照片', desc:'各空間原始樣貌、管線現況紀錄' },
+    { code:'02', name:'現況測繪圖', desc:'手繪丈量尺寸稿、原始CAD圖' },
+    { code:'03', name:'驗屋報告', desc:'若為新成屋，歸檔初驗與複驗缺失紀錄' },
+  ]},
+  { code:'02', name:'設計提案', en:'Design Proposals', icon:'✏️', color:'#C8A96E', children:[
+    { code:'01', name:'概念簡報', desc:'Mood board、風格意象、極簡主義參考圖' },
+    { code:'02', name:'平面配置圖', desc:'各版本平面圖、動線檢討、特殊配置紀錄' },
+    { code:'03', name:'會議紀錄', desc:'與業主歷次開會的決議與修改清單' },
+  ]},
+  { code:'03', name:'3D效果圖', en:'Renderings', icon:'🖼', color:'#C47B8A', children:[
+    { code:'01', name:'原始模型檔', desc:'Sketchup / 3ds Max 等工作檔' },
+    { code:'02', name:'渲染輸出＿測試圖', desc:'解析度較低、確認材質或視角用的草圖' },
+    { code:'03', name:'渲染輸出＿最終版', desc:'提供給客戶的高解析度定案圖' },
+  ]},
+  { code:'04', name:'施工圖面', en:'Construction Drawings', icon:'📐', color:'#7A9EC4', children:[
+    { code:'00', name:'圖面清單與圖號表', desc:'Drawing List，建立清晰的圖號編排系統' },
+    { code:'01', name:'CAD工作檔', desc:'整合所有圖紙的 DWG 母檔' },
+    { code:'02', name:'PDF輸出檔', desc:'依發包版本日期分類，例如 20260509_發包版' },
+    { code:'03', name:'大樣與剖面圖', desc:'特殊造型、收邊細部詳圖' },
+  ]},
+  { code:'05', name:'機電圖面', en:'MEP Drawings', icon:'⚡', color:'#C4A06B', children:[
+    { code:'01', name:'弱電與照明', desc:'開關插座配置、網路電話、燈具迴路圖' },
+    { code:'02', name:'空調與換氣', desc:'冷氣管線路徑、全熱交換器、出回風口配置' },
+    { code:'03', name:'給排水與消防', desc:'冷熱水管、糞管移位、消防撒水頭圖面' },
+  ]},
+  { code:'06', name:'材質與軟裝', en:'Materials & FF&E', icon:'🎨', color:'#9E7EC4', children:[
+    { code:'01', name:'建材表', desc:'各空間天地壁材質型號、地磚、漆號清單' },
+    { code:'02', name:'五金與設備', desc:'衛浴設備、廚具電器型號與規格書' },
+    { code:'03', name:'家具與特殊櫃體', desc:'訂製系統鞋櫃、沙發、活動家具尺寸與報價清單' },
+  ]},
+  { code:'07', name:'報價與發包', en:'Quotations & Bidding', icon:'💼', color:'#6BA8A8', children:[
+    { code:'01', name:'總工程報價單', desc:'提供給業主的正式報價單' },
+    { code:'02', name:'廠商報價', desc:'木作、泥作、機電等各工班底價單' },
+    { code:'03', name:'發包明細', desc:'確認發包的數量與金額紀錄' },
+  ]},
+  { code:'08', name:'工程管理', en:'Construction Management', icon:'🏗', color:'#A07A6B', children:[
+    { code:'01', name:'工程進度表', desc:'Gantt Chart 總表與各週進度' },
+    { code:'02', name:'施工日誌', desc:'每日/每週現場施工照片回報、隱蔽工程紀錄' },
+    { code:'03', name:'變更設計圖說', desc:'施工期間因現場狀況調整的圖面與確認單' },
+  ]},
+  { code:'09', name:'完工與交屋', en:'Completion & Handover', icon:'🏠', color:'#4A7C6E', children:[
+    { code:'01', name:'完工照片', desc:'專業攝影圖檔' },
+    { code:'02', name:'交屋手冊', desc:'設備保固書、材質維護說明、機電管線竣工圖' },
+    { code:'03', name:'結案檢討', desc:'內部成本利潤分析、專案檢討會議紀錄' },
+  ]},
+];
+
+function initProjectFolders(pid) {
+  const folders = DEFAULT_FOLDERS.map(f=>({
+    id: nid(), project_id: pid, code: f.code, name: f.name, en: f.en,
+    icon: f.icon, color: f.color, is_root: true, notes: '', files: [],
+    children: f.children.map(c=>({id: nid(), code: c.code, name: c.name, desc: c.desc, notes: '', files:[]}))
+  }));
+  lsSet('folders_'+pid, folders);
+}
+
 function ProjectList({ onSelect }) {
   const [projects, setProjects] = useDB('projects', []);
   const [showNew, setShowNew] = useState(false);
@@ -1018,6 +1757,7 @@ function ProjectList({ onSelect }) {
   const create = () => {
     if (!form.name.trim()) { toast('請輸入專案名稱','error'); return; }
     const p={id:nid(),...form,created_at:todayStr(),updated_at:todayStr()};
+    initProjectFolders(p.id);
     setProjects(prev=>[p,...prev]); setShowNew(false); setForm(defForm); toast('專案已建立：'+p.name);
   };
   const groups = [{s:'active',l:'進行中'},{s:'paused',l:'暫停'},{s:'closed',l:'已結案'}];
@@ -1114,6 +1854,100 @@ function AllTodosPage() {
 }
 
 /* ══════════════════════════════════════════
+   INSTAGRAM PAGE
+══════════════════════════════════════════ */
+const IG_HANDLE = 'artrium.tw';
+const IG_URL = 'https://www.instagram.com/artrium.tw/';
+
+function IGPage() {
+  const [loaded, setLoaded] = useState(false);
+  const [embedErr, setEmbedErr] = useState(false);
+
+  return (
+    <div>
+      {/* Header card */}
+      <div style={{background:'#fff',border:'1px solid #E8E8E2',borderRadius:12,padding:'24px 28px',marginBottom:20,display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
+        <div style={{width:64,height:64,borderRadius:'50%',background:'linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+          <span style={{fontSize:28}}>📸</span>
+        </div>
+        <div style={{flex:1,minWidth:200}}>
+          <div style={{fontSize:18,fontWeight:700,color:'#1A1A18',marginBottom:3}}>@{IG_HANDLE}</div>
+          <div style={{fontSize:13,color:'#888',marginBottom:10}}>artrium.tw · 無澀空間</div>
+          <a href={IG_URL} target="_blank" rel="noopener noreferrer"
+            style={{display:'inline-flex',alignItems:'center',gap:6,background:'linear-gradient(135deg,#f09433,#dc2743,#bc1888)',color:'#fff',padding:'8px 18px',borderRadius:8,fontSize:13,fontWeight:600,textDecoration:'none',transition:'opacity .15s'}}
+            onMouseOver={e=>e.currentTarget.style.opacity='.85'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+            <span>開啟 Instagram</span>
+            <span style={{fontSize:16}}>↗</span>
+          </a>
+        </div>
+        <div style={{fontSize:12,color:'#AAA',textAlign:'right',flexShrink:0}}>
+          <div>由於 Instagram 隱私政策</div>
+          <div>無法直接嵌入動態</div>
+          <div style={{marginTop:4}}>點擊左方按鈕開啟</div>
+        </div>
+      </div>
+
+      {/* Embedded iframe - Instagram profile page */}
+      <div style={{background:'#fff',border:'1px solid #E8E8E2',borderRadius:12,overflow:'hidden',position:'relative'}}>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid #EAEAE4',display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:8,height:8,borderRadius:'50%',background:'#C8A96E'}}/>
+          <span style={{fontSize:13,fontWeight:600,color:'#1A1A18'}}>Instagram · @{IG_HANDLE}</span>
+          <a href={IG_URL} target="_blank" rel="noopener noreferrer"
+            style={{marginLeft:'auto',fontSize:12,color:'#C8A96E',textDecoration:'none',fontWeight:500}}>在新分頁開啟 ↗</a>
+        </div>
+
+        {!embedErr ? (
+          <div style={{position:'relative'}}>
+            {!loaded&&(
+              <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#F8F8F4',gap:14,minHeight:500,zIndex:1}}>
+                <div style={{width:36,height:36,border:'3px solid #EAEAE4',borderTopColor:'#C8A96E',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
+                <div style={{fontSize:13,color:'#AAA'}}>載入 Instagram 中...</div>
+              </div>
+            )}
+            <iframe
+              src={IG_URL}
+              style={{width:'100%',height:600,border:'none',display:loaded?'block':'block',opacity:loaded?1:0,transition:'opacity .3s'}}
+              onLoad={()=>setLoaded(true)}
+              onError={()=>setEmbedErr(true)}
+              title="Instagram artrium.tw"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+            />
+          </div>
+        ) : (
+          <div style={{padding:'60px 20px',textAlign:'center',color:'#888'}}>
+            <div style={{fontSize:36,marginBottom:12}}>📱</div>
+            <div style={{fontSize:14,marginBottom:8,color:'#555',fontWeight:500}}>Instagram 不允許直接嵌入</div>
+            <div style={{fontSize:13,marginBottom:20,color:'#AAA'}}>請點擊下方按鈕在新分頁查看最新貼文</div>
+            <a href={IG_URL} target="_blank" rel="noopener noreferrer"
+              style={{display:'inline-flex',alignItems:'center',gap:8,background:'linear-gradient(135deg,#f09433,#dc2743,#bc1888)',color:'#fff',padding:'12px 24px',borderRadius:8,fontSize:14,fontWeight:600,textDecoration:'none'}}>
+              前往 @{IG_HANDLE} ↗
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Quick links */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginTop:16}}>
+        {[
+          {label:'查看最新貼文',desc:'開啟 IG 首頁動態',emoji:'🖼',url:IG_URL},
+          {label:'查看 Reels',desc:'短影片內容',emoji:'🎬',url:IG_URL+'reels/'},
+          {label:'查看標記',desc:'被標記的貼文',emoji:'🏷',url:IG_URL+'tagged/'},
+        ].map(({label,desc,emoji,url})=>(
+          <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+            style={{background:'#fff',border:'1px solid #E8E8E2',borderRadius:10,padding:'16px',textDecoration:'none',display:'flex',flexDirection:'column',gap:6,transition:'all .15s',cursor:'pointer'}}
+            onMouseOver={e=>{e.currentTarget.style.borderColor='#C8A96E';e.currentTarget.style.boxShadow='0 4px 14px rgba(200,169,110,.14)';}}
+            onMouseOut={e=>{e.currentTarget.style.borderColor='#E8E8E2';e.currentTarget.style.boxShadow='none';}}>
+            <span style={{fontSize:24}}>{emoji}</span>
+            <span style={{fontSize:13,fontWeight:600,color:'#1A1A18'}}>{label}</span>
+            <span style={{fontSize:12,color:'#AAA'}}>{desc}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    APP ROOT
 ══════════════════════════════════════════ */
 function App() {
@@ -1142,8 +1976,8 @@ function App() {
 
       <div className={`sidebar ${sbOpen?'open':''}`}>
         <div className="sidebar-logo" onClick={goBack}>
-          <div className="sb-mark">SQ</div>
-          <div className="sb-name">SQ Space</div>
+          <div className="sb-mark">無澀</div>
+          <div className="sb-name">無澀空間</div>
         </div>
 
         <div style={{padding:'8px 0'}}>
@@ -1160,14 +1994,15 @@ function App() {
             <>
               <SbItem label="專案庫" icon="🏗" active={view==='projects'} onClick={()=>navTo('projects')}/>
               <SbItem label="全部待辦" icon="✅" active={view==='todos'} onClick={()=>navTo('todos')}/>
+              <SbItem label="Instagram" icon="📸" active={view==='ig'} onClick={()=>navTo('ig')}/>
             </>
           )}
         </div>
 
         <div className="sb-user">
-          <div className="sb-avatar">SQ</div>
+          <div className="sb-avatar">無</div>
           <div style={{flex:1,overflow:'hidden'}}>
-            <div style={{fontSize:12,color:'#CCC',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>SQ Space</div>
+            <div style={{fontSize:12,color:'#CCC',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>無澀空間</div>
             <div style={{fontSize:10,color:'#444'}}>個人工作台</div>
           </div>
         </div>
@@ -1180,12 +2015,16 @@ function App() {
           <>
             <div className="topbar">
               <button className="hamburger" onClick={()=>setSbOpen(o=>!o)}><span/><span/><span/></button>
-              <div className="topbar-title">{view==='projects'?'專案庫':view==='todos'?'全部待辦事項':'SQ Space'}</div>
-              <div style={{fontSize:12,color:'#AAA',marginLeft:'auto'}}>SQ Space</div>
+              <div className="topbar-title">{view==='projects'?'專案庫':view==='todos'?'全部待辦事項':view==='ig'?'Instagram':'無澀空間'}</div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <SyncButton/>
+                <BackupButton/>
+              </div>
             </div>
             <div className="page-body">
               {view==='projects'&&<ProjectList onSelect={goProject}/>}
               {view==='todos'&&<AllTodosPage/>}
+              {view==='ig'&&<IGPage/>}
             </div>
           </>
         )}
@@ -1195,6 +2034,9 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+if(typeof _appReady==='function') setTimeout(_appReady, 100);
+
+// Init Google Drive after APIs load
 </script>
 </body>
 </html>
