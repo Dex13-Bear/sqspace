@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQ Space 專案管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',sans-serif;background:#F5F5F2;color:#2E2E2E;font-size:14px;line-height:1.6}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#F0F0EE}
+::-webkit-scrollbar-thumb{background:#C8C8C4;border-radius:3px}
+input,textarea,select,button{font-family:'Noto Sans TC',sans-serif;font-size:13px}
+button{cursor:pointer}
+
+.app-layout{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:204px;min-width:204px;background:#1A1A18;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{height:52px;background:#fff;border-bottom:1px solid #EAEAE6;display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
+.page-body{flex:1;overflow-y:auto;padding:24px}
+
+.sidebar-logo{padding:16px 16px 14px;border-bottom:1px solid #2C2C28;display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0}
+.sb-mark{width:34px;height:34px;background:#C8A96E;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#1A1A18;flex-shrink:0;letter-spacing:-.02em}
+.sb-name{font-size:14px;font-weight:600;color:#fff;letter-spacing:.04em}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 16px;color:#777770;cursor:pointer;transition:all .15s;font-size:12.5px;border-left:2px solid transparent;user-select:none}
+.sb-item:hover{background:#252521;color:#CCC}
+.sb-item.active{background:#252521;color:#fff;border-left-color:#C8A96E}
+.sb-icon{width:16px;text-align:center;flex-shrink:0;font-size:14px}
+.sb-divider{height:1px;background:#2A2A26;margin:4px 0}
+.sb-label{font-size:10px;color:#454540;padding:10px 16px 4px;text-transform:uppercase;letter-spacing:.12em}
+.sb-user{margin-top:auto;padding:12px 14px;border-top:1px solid #2A2A26;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sb-avatar{width:28px;height:28px;border-radius:50%;background:#C8A96E;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1A1A18;flex-shrink:0}
+
+.topbar-title{font-size:15px;font-weight:600;flex:1;color:#1A1A18}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:none;font-weight:500;transition:all .15s;white-space:nowrap;cursor:pointer}
+.btn-primary{background:#1A1A18;color:#fff}.btn-primary:hover{background:#333}
+.btn-gold{background:#C8A96E;color:#1A1A18;font-weight:600}.btn-gold:hover{background:#B89558}
+.btn-danger{background:#8B2E2E;color:#fff}.btn-danger:hover{background:#6B2020}
+.btn-ghost{background:transparent;color:#555;border:1px solid #D4D4CE}.btn-ghost:hover{background:#F0F0EC}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-xs{padding:3px 8px;font-size:11px}
+.btn-icon{padding:6px;background:transparent;border:none;color:#AAA;transition:color .15s}.btn-icon:hover{color:#222}
+
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-label{font-size:12px;color:#555;font-weight:500}
+.form-input{border:1px solid #D4D4CE;border-radius:6px;padding:7px 10px;background:#fff;width:100%;transition:border .15s;outline:none}
+.form-input:focus{border-color:#C8A96E}
+.form-select{border:1px solid #D4D4CE;border-radius:6px;padding:7px 10px;background:#fff;width:100%;outline:none;cursor:pointer}
+.form-select:focus{border-color:#C8A96E}
+.form-textarea{border:1px solid #D4D4CE;border-radius:6px;padding:8px 10px;background:#fff;width:100%;resize:vertical;outline:none;min-height:80px}
+.form-textarea:focus{border-color:#C8A96E}
+
+.card{background:#fff;border-radius:8px;border:1px solid #E8E8E2;overflow:hidden}
+.card-header{padding:13px 18px;border-bottom:1px solid #EAEAE4;display:flex;align-items:center;gap:10px}
+.card-title{font-size:14px;font-weight:600;color:#1A1A18}
+.card-body{padding:18px}
+
+table{width:100%;border-collapse:collapse}
+th{background:#F6F6F0;padding:8px 12px;text-align:left;font-size:11.5px;font-weight:600;color:#444;border-bottom:1.5px solid #D8D8D0;white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid #F0F0E8;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFAF6}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+th.num{text-align:right}
+
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-active{background:#E3EDE8;color:#2A5240}
+.badge-paused{background:#FBF0DC;color:#8B5E1A}
+.badge-closed{background:#EEEEEA;color:#888}
+
+.tab-bar{display:flex;border-bottom:1.5px solid #EAEAE4;overflow-x:auto;flex-shrink:0;padding:0 24px;background:#fff}
+.tab-item{padding:11px 15px;cursor:pointer;font-size:13px;font-weight:500;color:#999;border-bottom:2px solid transparent;margin-bottom:-1.5px;white-space:nowrap;transition:all .15s;user-select:none}
+.tab-item:hover{color:#444}
+.tab-item.active{color:#1A1A18;border-bottom-color:#C8A96E;font-weight:600}
+.tab-content{flex:1;overflow-y:auto;padding:24px}
+
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.project-card{background:#fff;border-radius:8px;border:1px solid #E8E8E2;padding:16px 18px;cursor:pointer;transition:all .15s}
+.project-card:hover{border-color:#C8A96E;box-shadow:0 4px 18px rgba(200,169,110,.14);transform:translateY(-1px)}
+.p-card-name{font-size:15px;font-weight:600;color:#1A1A18;margin-bottom:3px}
+.p-card-client{font-size:12px;color:#888;margin-bottom:10px}
+.p-card-meta{display:flex;gap:8px;font-size:11px;color:#AAA;flex-wrap:wrap}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-title{font-size:15px;font-weight:700;color:#1A1A18}
+
+.cat-header{background:#EEEEEA;padding:10px 14px;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:space-between;border-radius:6px 6px 0 0;border:1px solid #DDDDD6;border-bottom:none}
+.cat-body{border:1px solid #DDDDD6;border-radius:0 0 6px 6px;margin-bottom:18px;overflow:hidden}
+.cat-subtotal{background:#F6F6F0;padding:7px 14px;text-align:right;font-size:12px;font-weight:600;color:#333;border-top:1px solid #E8E8E0}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:10px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.modal-header{padding:16px 20px;border-bottom:1px solid #EAEAE4;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-title{font-size:15px;font-weight:700}
+.modal-body{padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.modal-footer{padding:12px 20px;border-top:1px solid #EAEAE4;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.flex{display:flex}.flex-1{flex:1}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.gap-2{gap:8px}.gap-3{gap:12px}
+.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}.mb-4{margin-bottom:16px}
+.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mt-4{margin-top:16px}
+.text-sm{font-size:12px}.text-xs{font-size:11px}.text-muted{color:#888}
+.text-danger{color:#8B2E2E}.text-gold{color:#C8A96E}
+.font-bold{font-weight:700}.font-semibold{font-weight:600}
+.text-right{text-align:right}
+.divider{border:none;border-top:1px solid #EAEAE4;margin:14px 0}
+
+.toast-wrap{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:#fff;border:1px solid #E0E0DA;border-radius:8px;padding:11px 16px;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;min-width:220px;animation:tin .2s ease;pointer-events:none}
+.toast-success{border-left:3px solid #C8A96E}
+.toast-error{border-left:3px solid #8B2E2E}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+.spinner{width:28px;height:28px;border:3px solid #EAEAE4;border-top-color:#C8A96E;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-center{display:flex;align-items:center;justify-content:center;padding:60px;flex-direction:column;gap:12px;color:#888;font-size:13px}
+
+.proj-detail{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.proj-topbar{padding:13px 24px;background:#fff;border-bottom:1px solid #EAEAE4;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap}
+
+.pb-wrap{height:5px;border-radius:3px;background:#EAEAE4;overflow:hidden}
+.pb-fill{height:100%;background:#C8A96E;border-radius:3px;transition:width .35s}
+
+.stat-card{background:#F8F8F2;border-radius:8px;padding:14px 16px}
+.stat-val{font-size:21px;font-weight:700;color:#1A1A18;line-height:1.2}
+.stat-lbl{font-size:11px;color:#888;margin-top:3px}
+
+.ie{border:none;background:transparent;width:100%;padding:2px 4px;border-radius:4px;font-size:13px;outline:none;font-family:inherit;color:inherit}
+.ie:hover{background:#F0F0E8}
+.ie:focus{background:#fff;border:1px solid #C8A96E}
+
+.todo-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F4F4EE}
+.log-card{border:1px solid #E4E4DC;border-radius:8px;padding:16px;margin-bottom:12px;background:#fff}
+.log-hdr{font-weight:600;font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.gantt-bar{background:#C8A96E;border-radius:3px;height:20px;display:flex;align-items:center;padding:0 7px;color:#1A1A18;font-size:10px;font-weight:600;white-space:nowrap;min-width:4px;margin-bottom:1px}
+.pay-stage{background:#fff;border:1px solid #E4E4DC;border-radius:8px;padding:14px 16px;margin-bottom:10px}
+.pay-stage.current{border-left:3px solid #C8A96E}
+.flow-card{background:#fff;border-radius:8px;border:1px solid #E4E4DC;margin-bottom:10px;overflow:hidden}
+.flow-hdr{padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;background:#F8F8F2;user-select:none}
+.flow-hdr.done{background:#F4F7F2}
+
+@media(max-width:768px){
+  .sidebar{position:fixed;top:0;left:0;bottom:0;z-index:500;transform:translateX(-100%);transition:transform .25s ease;width:230px;min-width:230px}
+  .sidebar.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.5)}
+  .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:499}
+  .sb-overlay.open{display:block}
+  .project-grid{grid-template-columns:1fr}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .tab-bar{padding:0 6px}.tab-content{padding:12px}
+  .topbar{padding:0 12px}.page-body{padding:12px}
+  .modal-overlay{padding:0;align-items:flex-end}
+  .modal{max-width:100%;max-height:92vh;border-radius:16px 16px 0 0}
+  .proj-topbar{padding:10px 12px}
+}
+.hamburger{display:none;background:none;border:none;color:#666;padding:6px;cursor:pointer;flex-direction:column;gap:4px;flex-shrink:0}
+.hamburger span{display:block;width:20px;height:2px;background:#666;border-radius:2px}
+@media(max-width:768px){.hamburger{display:flex!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toasts" style="position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+/* ─── Toast ─── */
+function toast(msg, type='success') {
+  const c = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span>${type==='success'?'✓':'!'}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),350); }, 2800);
+}
+
+/* ─── Helpers ─── */
+const fmt = n => 'NT$' + Math.round(n||0).toLocaleString();
+const todayStr = () => new Date().toISOString().split('T')[0];
+const fmtDate = d => d ? d.replace(/-/g,'/') : '—';
+
+/* ─── LocalStorage DB ─── */
+let _nid = +（localStorage.getItem('sq_nid')||1000);
+const nid = () => { _nid++; localStorage.setItem('sq_nid', _nid); return _nid; };
+
+function lsGet(k, def) {
+  try { const v = localStorage.getItem('sq_'+k); return v ? JSON.parse(v) : (typeof def==='function'?def():def); } catch { return typeof def==='function'?def():def; }
+}
+function lsSet(k, v) { try { localStorage.setItem('sq_'+k, JSON.stringify(v)); } catch {} }
+
+function useDB(key, def) {
+  const [val, setValRaw] = useState(() => lsGet(key, def));
+  const setVal = useCallback(v => {
+    setValRaw(prev => { const next = typeof v==='function' ? v(prev) : v; lsSet(key, next); return next; });
+  }, [key]);
+  return [val, setVal];
+}
+
+/* ─── IME-safe components ─── */
+function IInput({ value, onChange, className, style, type, placeholder, disabled }) {
+  const [loc, setLoc] = useState(value??'');
+  const cmp = useRef(false);
+  useEffect(()=>{ if(!cmp.current) setLoc(value??''); },[value]);
+  return <input className={className||'form-input'} type={type||'text'} style={style} placeholder={placeholder} disabled={disabled} value={loc}
+    onChange={e=>setLoc(e.target.value)}
+    onCompositionStart={()=>{ cmp.current=true; }}
+    onCompositionEnd={e=>{ cmp.current=false; setLoc(e.target.value); onChange(e.target.value); }}
+    onBlur={e=>{ if(!cmp.current) onChange(e.target.value); }}
+  />;
+}
+function ITextarea({ value, onChange, className, style, placeholder, rows }) {
+  const [loc, setLoc] = useState(value??'');
+  const cmp = useRef(false);
+  useEffect(()=>{ if(!cmp.current) setLoc(value??''); },[value]);
+  return <textarea className={className||'form-textarea'} style={style} placeholder={placeholder} rows={rows} value={loc}
+    onChange={e=>setLoc(e.target.value)}
+    onCompositionStart={()=>{ cmp.current=true; }}
+    onCompositionEnd={e=>{ cmp.current=false; setLoc(e.target.value); onChange(e.target.value); }}
+    onBlur={e=>{ if(!cmp.current) onChange(e.target.value); }}
+  />;
+}
+function IE({ value, onChange, style, type, placeholder, className }) {
+  const [loc, setLoc] = useState(value??'');
+  const cmp = useRef(false); const timer = useRef(null);
+  useEffect(()=>{ if(!cmp.current) setLoc(value??''); },[value]);
+  const save = v => { clearTimeout(timer.current); timer.current=setTimeout(()=>onChange(v),600); };
+  return <input className={className||'ie'} type={type||'text'} style={style} value={loc} placeholder={placeholder}
+    onChange={e=>{ setLoc(e.target.value); if(!cmp.current) save(e.target.value); }}
+    onCompositionStart={()=>{ cmp.current=true; }}
+    onCompositionEnd={e=>{ cmp.current=false; setLoc(e.target.value); save(e.target.value); }}
+    onBlur={e=>{ clearTimeout(timer.current); if(!cmp.current) onChange(e.target.value); }}
+    onKeyDown={e=>{ if(e.key==='Enter'&&!cmp.current) e.target.blur(); }}
+  />;
+}
+
+/* ─── Modal ─── */
+function Modal({ open, title, onClose, children, footer, wide }) {
+  if (!open) return null;
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={wide?{maxWidth:680}:{}}>
+        <div className="modal-header">
+          <div className="modal-title">{title}</div>
+          <button className="btn-icon" onClick={onClose} style={{fontSize:16}}>✕</button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer&&<div className="modal-footer">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Status helpers ─── */
+const STATUS_LABEL = {active:'進行中',paused:'暫停',closed:'已結案'};
+const STATUS_BADGE = {active:'badge-active',paused:'badge-paused',closed:'badge-closed'};
+
+/* ─── Flow stages default ─── */
+const FLOW_STAGES = [
+  {key:'consult',name:'初次洽談'},{key:'survey',name:'丈量現勘'},{key:'layout',name:'平面討論'},
+  {key:'design',name:'設計定案'},{key:'quote',name:'估價簽約'},{key:'prepare',name:'備料開工'},
+  {key:'construct',name:'施工中'},{key:'inspect',name:'驗收'},{key:'handover',name:'完工交屋'},
+];
+
+/* ══════════════════════════════════════════
+   SUMMARY TAB
+══════════════════════════════════════════ */
+function SummaryTab({ project, onUpdate }) {
+  const cats  = lsGet('wcats_'+project.id, []);
+  const items = lsGet('witems_'+project.id, []);
+  const pays  = lsGet('pays_'+project.id, []);
+  const todos = lsGet('todos_'+project.id, []).filter(t=>!t.is_done);
+
+  const catTotal = cid => items.filter(i=>i.category_id===cid).reduce((s,i)=>s+i.unit_price*i.quantity,0);
+  const workTotal = cats.reduce((s,c)=>s+catTotal(c.id),0);
+  const dFee = (project.area_sqm||0)*(project.design_fee_per_sqm||0);
+  const mFee = workTotal*((project.management_fee_rate||7)/100);
+  const sub = workTotal+dFee+mFee;
+  const tax = project.tax_enabled ? sub*((project.tax_rate||5)/100) : 0;
+  const pTotal = lsGet('pitems_'+project.id,[]).reduce((s,i)=>s+i.unit_price*i.quantity,0);
+  const grand = sub+tax+pTotal;
+  const totalPaid = pays.reduce((s,p)=>s+(p.paid_amount||0),0);
+  const pct = grand ? Math.min(100,Math.round(totalPaid/grand*100)) : 0;
+
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({...project});
+  const save = () => { onUpdate({...form}); setEditing(false); toast('專案資訊已更新'); };
+  const F = (field,label,type='text') => (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      {type==='textarea'
+        ? <ITextarea value={form[field]||''} onChange={v=>setForm(p=>({...p,[field]:v}))}/>
+        : <IInput type={type} value={form[field]??''} onChange={v=>setForm(p=>({...p,[field]:type==='number'?+v:v}))}/>
+      }
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="grid-3 mb-4">
+        <div className="stat-card"><div className="stat-val">{fmt(grand)}</div><div className="stat-lbl">工程總金額</div></div>
+        <div className="stat-card"><div className="stat-val" style={{color:'#C8A96E'}}>{fmt(totalPaid)}</div><div className="stat-lbl">已收款（{pct}%）</div></div>
+        <div className="stat-card"><div className="stat-val" style={{color:todos.length?'#8B2E2E':'#3A5240'}}>{todos.length}</div><div className="stat-lbl">未完成待辦</div></div>
+      </div>
+
+      <div className="grid-2 mb-4">
+        <div className="card">
+          <div className="card-header" style={{justifyContent:'space-between'}}>
+            <span className="card-title">專案資訊</span>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setForm({...project});setEditing(true);}}>編輯</button>
+          </div>
+          <div className="card-body" style={{padding:'12px 18px'}}>
+            {[['專案名稱',project.name],['客戶名稱',project.client_name||'—'],['聯絡人',project.contact_person||'—'],
+              ['聯絡電話',project.contact_phone||'—'],['施工地址',project.address||'—'],
+              ['開始日期',fmtDate(project.project_date)],['坪數',project.area_sqm?project.area_sqm+'坪':'—']
+            ].map(([k,v])=>(
+              <div key={k} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:'1px solid #F6F6F0',fontSize:13}}>
+                <span style={{color:'#888',width:68,flexShrink:0}}>{k}</span>
+                <span style={{color:'#1A1A18',fontWeight:500,wordBreak:'break-all'}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header"><span className="card-title">費用結構</span></div>
+          <div className="card-body" style={{padding:'12px 18px'}}>
+            {cats.map(c=>(
+              <div key={c.id} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #F6F6F0',fontSize:13}}>
+                <span style={{color:'#555'}}>{c.name}</span><span style={{fontWeight:500}}>{fmt(catTotal(c.id))}</span>
+              </div>
+            ))}
+            {cats.length>0&&<div className="divider"/>}
+            {[['工程小計',workTotal],dFee?['設計費',dFee]:null,['管理費（'+(project.management_fee_rate||7)+'%）',mFee],
+              project.tax_enabled?['營業稅（'+(project.tax_rate||5)+'%）',tax]:null,pTotal?['採購總計',pTotal]:null
+            ].filter(Boolean).map(([k,v])=>(
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:12,color:'#888'}}><span>{k}</span><span>{fmt(v)}</span></div>
+            ))}
+            <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0 4px',fontSize:15,fontWeight:700,borderTop:'1.5px solid #1A1A18',marginTop:4}}>
+              <span>合計</span><span style={{color:'#C8A96E'}}>{fmt(grand)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {project.notes&&(
+        <div className="card mb-4">
+          <div className="card-header"><span className="card-title">注意事項</span></div>
+          <div className="card-body" style={{fontSize:13,color:'#555',whiteSpace:'pre-wrap'}}>{project.notes}</div>
+        </div>
+      )}
+
+      <div style={{display:'flex',gap:14,alignItems:'center'}}>
+        <span style={{fontSize:13,color:'#555',fontWeight:500,flexShrink:0}}>收款進度</span>
+        <div style={{flex:1}}><div className="pb-wrap"><div className="pb-fill" style={{width:pct+'%'}}/></div></div>
+        <span style={{fontSize:13,fontWeight:600,color:'#C8A96E',flexShrink:0}}>{pct}%</span>
+      </div>
+
+      <Modal open={editing} title="編輯專案資訊" onClose={()=>setEditing(false)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setEditing(false)}>取消</button><button className="btn btn-primary" onClick={save}>儲存</button></>}>
+        {F('name','專案名稱')}
+        <div className="grid-2">{F('client_name','客戶名稱')}{F('contact_person','聯絡人')}</div>
+        <div className="grid-2">{F('contact_phone','聯絡電話')}<div className="form-group"><label className="form-label">開始日期</label><input className="form-input" type="date" value={form.project_date||''} onChange={e=>setForm(p=>({...p,project_date:e.target.value}))}/></div></div>
+        {F('address','施工地址')}
+        <div className="grid-3">{F('area_sqm','坪數','number')}{F('management_fee_rate','管理費率(%)','number')}{F('design_fee_per_sqm','設計費/坪','number')}</div>
+        <div className="grid-2">
+          <div className="form-group"><label className="form-label">狀態</label>
+            <select className="form-select" value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))}>
+              <option value="active">進行中</option><option value="paused">暫停</option><option value="closed">已結案</option>
+            </select>
+          </div>
+          <div className="form-group" style={{justifyContent:'flex-end',paddingTop:18}}>
+            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13}}>
+              <input type="checkbox" checked={!!form.tax_enabled} onChange={e=>setForm(p=>({...p,tax_enabled:e.target.checked}))} style={{accentColor:'#C8A96E'}}/>
+              含稅（{form.tax_rate||5}%）
+            </label>
+          </div>
+        </div>
+        {F('notes','注意事項','textarea')}
+      </Modal>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   FLOW TAB
+══════════════════════════════════════════ */
+function FlowTab({ project }) {
+  const [stages, setStages] = useDB('flow_'+project.id,
+    () => FLOW_STAGES.map(s=>({...s,id:nid(),is_done:false,planned_date:'',actual_date:'',notes:'',_open:false}))
+  );
+  const toggle = i => setStages(p=>p.map((s,idx)=>idx===i?{...s,is_done:!s.is_done,actual_date:!s.is_done?todayStr():''}:s));
+  const upd = (i,f,v) => setStages(p=>p.map((s,idx)=>idx===i?{...s,[f]:v}:s));
+  const done = stages.filter(s=>s.is_done).length;
+  const pct = Math.round(done/stages.length*100);
+
+  return (
+    <div>
+      <div className="card mb-4" style={{padding:'16px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <div className="section-title" style={{margin:0}}>專案進度總覽</div>
+          <span style={{fontSize:13,color:'#888'}}>{done} / {stages.length} 完成</span>
+        </div>
+        <div className="pb-wrap mb-3"><div className="pb-fill" style={{width:pct+'%'}}/></div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {stages.map((s,i)=>(
+            <span key={s.id} onClick={()=>upd(i,'_open',!s._open)} style={{fontSize:11,fontWeight:500,padding:'3px 9px',borderRadius:20,cursor:'pointer',
+              background:s.is_done?'#E8F0EC':'#F0F0E8',color:s.is_done?'#3A5240':'#666',border:'1px solid '+(s.is_done?'#C0D8C8':'#E0E0D8')}}>
+              {s.is_done?'✓':i+1+'.'} {s.name}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {stages.map((s,i)=>(
+        <div key={s.id} className="flow-card">
+          <div className={`flow-hdr ${s.is_done?'done':''}`} onClick={()=>upd(i,'_open',!s._open)}>
+            <div onClick={e=>{e.stopPropagation();toggle(i);}} style={{
+              width:26,height:26,borderRadius:'50%',
+              border:'2px solid '+(s.is_done?'#C8A96E':'#D0D0C8'),
+              display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',
+              background:s.is_done?'#C8A96E':'#fff',flexShrink:0,transition:'all .2s'
+            }}>
+              {s.is_done?<span style={{color:'#1A1A18',fontSize:12,fontWeight:700}}>✓</span>:<span style={{color:'#AAA',fontSize:11}}>{i+1}</span>}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:600,fontSize:13.5,color:s.is_done?'#8B6A30':'#222'}}>{s.name}</div>
+              {(s.planned_date||s.actual_date)&&(
+                <div style={{fontSize:11,color:'#999',marginTop:2,display:'flex',gap:12}}>
+                  {s.planned_date&&<span>預計：{fmtDate(s.planned_date)}</span>}
+                  {s.actual_date&&<span style={{color:'#C8A96E'}}>完成：{fmtDate(s.actual_date)}</span>}
+                </div>
+              )}
+            </div>
+            <span style={{color:'#CCC',fontSize:12}}>{s._open?'▲':'▼'}</span>
+          </div>
+          {s._open&&(
+            <div style={{padding:'12px 16px',borderTop:'1px solid #F0F0E8'}}>
+              <div style={{display:'flex',gap:16,marginBottom:12,flexWrap:'wrap'}}>
+                {[['planned_date','預計日期'],['actual_date','實際完成']].map(([f,lb])=>(
+                  <div key={f} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+                    <span style={{color:'#888',flexShrink:0}}>{lb}</span>
+                    <input type="date" value={s[f]||''} onChange={e=>upd(i,f,e.target.value)}
+                      style={{border:'1px solid #D4D4CE',borderRadius:5,padding:'3px 8px',fontSize:12}}/>
+                  </div>
+                ))}
+              </div>
+              <ITextarea value={s.notes||''} onChange={v=>upd(i,'notes',v)} placeholder="此階段備註..." style={{minHeight:50,fontSize:12,color:'#555'}}/>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   WORK ITEMS TAB
+══════════════════════════════════════════ */
+function WorkTab({ project }) {
+  const [cats, setCats] = useDB('wcats_'+project.id, []);
+  const [items, setItems] = useDB('witems_'+project.id, []);
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [collapsed, setCollapsed] = useState({});
+
+  const catTotal = cid => items.filter(i=>i.category_id===cid).reduce((s,i)=>s+i.unit_price*i.quantity,0);
+  const grand = cats.reduce((s,c)=>s+catTotal(c.id),0);
+
+  const addCat = () => {
+    if (!newCatName.trim()) return;
+    setCats(p=>[...p,{id:nid(),name:newCatName.trim(),sort_order:p.length}]);
+    setNewCatName(''); setShowAddCat(false); toast('已新增大項');
+  };
+  const delCat = id => { if(!confirm('確認刪除此大項及所有細項？')) return; setCats(p=>p.filter(c=>c.id!==id)); setItems(p=>p.filter(i=>i.category_id!==id)); };
+  const addItem = cid => setItems(p=>[...p,{id:nid(),category_id:cid,name:'新細項',unit:'式',quantity:1,unit_price:0,notes:'',sort_order:p.filter(i=>i.category_id===cid).length}]);
+  const updItem = (id,f,v) => setItems(p=>p.map(i=>i.id===id?{...i,[f]:v}:i));
+  const delItem = id => setItems(p=>p.filter(i=>i.id!==id));
+
+  const exportXlsx = () => {
+    const wb = XLSX.utils.book_new();
+    const rows = [];
+    cats.forEach((cat,ci)=>{
+      rows.push({'項次':String.fromCharCode(65+ci),'細項名稱':cat.name,'單位':'','數量':'','單價':'','總計':'','備註':''});
+      items.filter(i=>i.category_id===cat.id).forEach((it,ii)=>{
+        rows.push({'項次':ii+1,'細項名稱':it.name,'單位':it.unit,'數量':it.quantity,'單價':it.unit_price,'總計':it.unit_price*it.quantity,'備註':it.notes||''});
+      });
+      rows.push({'項次':'','細項名稱':'小計','單位':'','數量':'','單價':'','總計':catTotal(cat.id),'備註':''});
+      rows.push({});
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols']=[{wch:6},{wch:36},{wch:6},{wch:6},{wch:10},{wch:12},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws, '工程明細');
+    XLSX.writeFile(wb, project.name+'_工程明細.xlsx');
+  };
+
+  return (
+    <div>
+      <div className="section-header">
+        <div className="section-title">工程明細</div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost btn-sm" onClick={exportXlsx}>匯出 Excel</button>
+          <button className="btn btn-primary btn-sm" onClick={()=>setShowAddCat(true)}>＋ 新增大項</button>
+        </div>
+      </div>
+
+      {cats.map((cat,ci)=>{
+        const citems = items.filter(i=>i.category_id===cat.id);
+        return (
+          <div key={cat.id}>
+            <div className="cat-header">
+              <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}} onClick={()=>setCollapsed(p=>({...p,[cat.id]:!p[cat.id]}))}>
+                <span style={{color:'#888',fontSize:12}}>{String.fromCharCode(65+ci)}.</span>
+                <span>{cat.name}</span>
+                <span style={{fontSize:12,color:'#C8A96E',marginLeft:8,fontWeight:400}}>小計：{fmt(catTotal(cat.id))}</span>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>addItem(cat.id)}>＋ 新增細項</button>
+                <button className="btn btn-xs" style={{background:'#FFF0F0',color:'#8B2E2E',border:'1px solid #EEC0C0',borderRadius:4,padding:'3px 8px'}} onClick={()=>delCat(cat.id)}>刪除</button>
+                <span style={{color:'#AAA',fontSize:13,cursor:'pointer'}} onClick={()=>setCollapsed(p=>({...p,[cat.id]:!p[cat.id]}))}>{collapsed[cat.id]?'▲':'▼'}</span>
+              </div>
+            </div>
+            {!collapsed[cat.id]&&(
+              <div className="cat-body">
+                <table>
+                  <thead><tr><th>細項名稱</th><th style={{width:55}}>單位</th><th className="num" style={{width:65}}>數量</th><th className="num" style={{width:92}}>報價單價</th><th className="num" style={{width:105}}>報價總計</th><th>備註</th><th style={{width:42}}></th></tr></thead>
+                  <tbody>
+                    {citems.map(it=>(
+                      <tr key={it.id}>
+                        <td><IE value={it.name} onChange={v=>updItem(it.id,'name',v)}/></td>
+                        <td><IE value={it.unit} style={{width:44,textAlign:'center'}} onChange={v=>updItem(it.id,'unit',v)}/></td>
+                        <td className="num"><IE value={it.quantity} type="number" style={{width:54,textAlign:'right'}} onChange={v=>updItem(it.id,'quantity',+v)}/></td>
+                        <td className="num"><IE value={it.unit_price} type="number" style={{width:78,textAlign:'right'}} onChange={v=>updItem(it.id,'unit_price',+v)}/></td>
+                        <td className="num" style={{fontWeight:500}}>{fmt(it.unit_price*it.quantity)}</td>
+                        <td><IE value={it.notes||''} placeholder="備註" onChange={v=>updItem(it.id,'notes',v)}/></td>
+                        <td style={{textAlign:'center'}}><button className="btn-icon" style={{color:'#DDD'}} onClick={()=>delItem(it.id)}>✕</button></td>
+                      </tr>
+                    ))}
+                    {!citems.length&&<tr><td colSpan={7} style={{textAlign:'center',color:'#CCC',fontSize:12,padding:14}}>（尚無細項，點右上角 ＋ 新增）</td></tr>}
+                  </tbody>
+                </table>
+                <div className="cat-subtotal">小計：{fmt(catTotal(cat.id))}</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {!cats.length&&<div style={{textAlign:'center',padding:40,color:'#CCC',fontSize:13}}>尚無工程大項，請點「新增大項」建立</div>}
+      <div style={{textAlign:'right',padding:'14px 0',fontSize:16,fontWeight:700,borderTop:'2px solid #1A1A18',marginTop:4}}>
+        工程總計：<span style={{color:'#C8A96E'}}>{fmt(grand)}</span>
+      </div>
+
+      <Modal open={showAddCat} title="新增工程大項" onClose={()=>setShowAddCat(false)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setShowAddCat(false)}>取消</button><button className="btn btn-primary" onClick={addCat}>新增</button></>}>
+        <div className="form-group"><label className="form-label">大項名稱 *</label><IInput value={newCatName} onChange={setNewCatName} placeholder="例：木作工程"/></div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PURCHASE TAB
+══════════════════════════════════════════ */
+function PurchaseTab({ project }) {
+  const [cats, setCats] = useDB('pcats_'+project.id, []);
+  const [items, setItems] = useDB('pitems_'+project.id, []);
+  const [showCat, setShowCat] = useState(false);
+  const [newCat, setNewCat] = useState('');
+  const [showItem, setShowItem] = useState(null);
+  const [ni, setNi] = useState({name:'',unit:'台',quantity:1,unit_price:0,notes:''});
+
+  const catTotal = cid => items.filter(i=>i.category_id===cid).reduce((s,i)=>s+i.unit_price*i.quantity,0);
+  const grand = cats.reduce((s,c)=>s+catTotal(c.id),0);
+
+  return (
+    <div>
+      <div className="section-header">
+        <div><div className="section-title">採購明細</div><div className="text-sm text-muted mt-2">採購總計：<strong style={{color:'#8B2E2E'}}>{fmt(grand)}</strong></div></div>
+        <button className="btn btn-primary btn-sm" onClick={()=>setShowCat(true)}>＋ 新增採購大項</button>
+      </div>
+      {cats.map((cat,ci)=>{
+        const ci2 = items.filter(i=>i.category_id===cat.id);
+        return (
+          <div key={cat.id} className="mb-4">
+            <div className="cat-header">
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{color:'#888',fontSize:12}}>{ci+1}.</span><span>{cat.name}</span>
+                <span style={{fontSize:12,color:'#C8A96E',marginLeft:8,fontWeight:400}}>小計：{fmt(catTotal(cat.id))}</span>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setShowItem(cat.id)}>＋ 新增項目</button>
+                <button className="btn btn-xs" style={{background:'#FFF0F0',color:'#8B2E2E',border:'1px solid #EEC0C0',borderRadius:4,padding:'3px 8px'}}
+                  onClick={()=>{if(!confirm('確認刪除？'))return; setCats(p=>p.filter(c=>c.id!==cat.id)); setItems(p=>p.filter(i=>i.category_id!==cat.id));}}>刪除</button>
+              </div>
+            </div>
+            <div className="cat-body">
+              <table>
+                <thead><tr><th>物品名稱</th><th style={{width:55,textAlign:'center'}}>單位</th><th className="num" style={{width:65}}>數量</th><th className="num" style={{width:92}}>報價單價</th><th className="num" style={{width:105}}>報價總計</th><th>備註</th><th style={{width:42}}></th></tr></thead>
+                <tbody>
+                  {ci2.map(it=>(
+                    <tr key={it.id}>
+                      <td><IE value={it.name} onChange={v=>setItems(p=>p.map(i=>i.id===it.id?{...i,name:v}:i))}/></td>
+                      <td style={{textAlign:'center'}}><IE value={it.unit||''} style={{width:44,textAlign:'center'}} onChange={v=>setItems(p=>p.map(i=>i.id===it.id?{...i,unit:v}:i))}/></td>
+                      <td className="num"><IE value={it.quantity} type="number" style={{width:54,textAlign:'right'}} onChange={v=>setItems(p=>p.map(i=>i.id===it.id?{...i,quantity:+v}:i))}/></td>
+                      <td className="num"><IE value={it.unit_price} type="number" style={{width:78,textAlign:'right'}} onChange={v=>setItems(p=>p.map(i=>i.id===it.id?{...i,unit_price:+v}:i))}/></td>
+                      <td className="num" style={{fontWeight:500}}>{fmt(it.unit_price*it.quantity)}</td>
+                      <td><IE value={it.notes||''} placeholder="備註" onChange={v=>setItems(p=>p.map(i=>i.id===it.id?{...i,notes:v}:i))}/></td>
+                      <td style={{textAlign:'center'}}><button className="btn-icon" style={{color:'#DDD'}} onClick={()=>setItems(p=>p.filter(i=>i.id!==it.id))}>✕</button></td>
+                    </tr>
+                  ))}
+                  {!ci2.length&&<tr><td colSpan={7} style={{textAlign:'center',color:'#CCC',fontSize:12,padding:14}}>尚無採購項目</td></tr>}
+                </tbody>
+              </table>
+              <div className="cat-subtotal">小計：{fmt(catTotal(cat.id))}</div>
+            </div>
+          </div>
+        );
+      })}
+      {!cats.length&&<div style={{textAlign:'center',padding:40,color:'#CCC',fontSize:13}}>尚無採購大項</div>}
+
+      <Modal open={showCat} title="新增採購大項" onClose={()=>setShowCat(false)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setShowCat(false)}>取消</button><button className="btn btn-primary" onClick={()=>{if(!newCat.trim())return; setCats(p=>[...p,{id:nid(),name:newCat.trim(),sort_order:p.length}]); setNewCat(''); setShowCat(false); toast('已新增採購大項');}}>新增</button></>}>
+        <div className="form-group"><label className="form-label">大項名稱 *</label><IInput value={newCat} onChange={setNewCat} placeholder="例：電器設備"/></div>
+      </Modal>
+      <Modal open={!!showItem} title="新增採購項目" onClose={()=>setShowItem(null)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setShowItem(null)}>取消</button><button className="btn btn-primary" onClick={()=>{if(!ni.name.trim())return; setItems(p=>[...p,{...ni,id:nid(),category_id:showItem,sort_order:p.filter(i=>i.category_id===showItem).length}]); setNi({name:'',unit:'台',quantity:1,unit_price:0,notes:''}); setShowItem(null); toast('已新增採購項目');}}>新增</button></>}>
+        <div className="form-group"><label className="form-label">物品名稱 *</label><IInput value={ni.name} onChange={v=>setNi(p=>({...p,name:v}))}/></div>
+        <div className="grid-3">
+          <div className="form-group"><label className="form-label">單位</label><IInput value={ni.unit} onChange={v=>setNi(p=>({...p,unit:v}))}/></div>
+          <div className="form-group"><label className="form-label">數量</label><input className="form-input" type="number" value={ni.quantity} onChange={e=>setNi(p=>({...p,quantity:+e.target.value}))}/></div>
+          <div className="form-group"><label className="form-label">單價</label><input className="form-input" type="number" value={ni.unit_price} onChange={e=>setNi(p=>({...p,unit_price:+e.target.value}))}/></div>
+        </div>
+        <div className="form-group"><label className="form-label">備註</label><IInput value={ni.notes} onChange={v=>setNi(p=>({...p,notes:v}))}/></div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   SCHEDULE TAB
+══════════════════════════════════════════ */
+function ScheduleTab({ project }) {
+  const [items, setItems] = useDB('sched_'+project.id, []);
+  const [events, setEvents] = useDB('sevents_'+project.id, []);
+  const [showEvt, setShowEvt] = useState(false);
+  const [ne, setNe] = useState({name:'',start_date:todayStr(),end_date:todayStr()});
+  const cats = lsGet('wcats_'+project.id, []);
+
+  const addStage = catName => setItems(p=>[...p,{id:nid(),category_name:catName,stage_name:'',start_date:todayStr(),end_date:todayStr()}]);
+  const updStage = (id,f,v) => setItems(p=>p.map(i=>i.id===id?{...i,[f]:v}:i));
+  const delStage = id => setItems(p=>p.filter(i=>i.id!==id));
+  const addEvent = () => { if(!ne.name.trim()) return; setEvents(p=>[...p,{id:nid(),...ne}]); setNe({name:'',start_date:todayStr(),end_date:todayStr()}); setShowEvt(false); toast('已新增事件'); };
+  const delEvent = id => setEvents(p=>p.filter(e=>e.id!==id));
+
+  const allDates=[...items.flatMap(i=>[i.start_date,i.end_date]),...events.flatMap(e=>[e.start_date,e.end_date])].filter(Boolean).sort();
+  const hasData = allDates.length>0;
+  let gS = hasData?new Date(allDates[0]):new Date();
+  let gE = hasData?new Date(allDates[allDates.length-1]):new Date();
+  gS.setDate(gS.getDate()-((gS.getDay()+6)%7));
+  const weeks=[]; const cur=new Date(gS);
+  while(cur<=gE||weeks.length<4){ const ws=new Date(cur),we=new Date(cur); we.setDate(we.getDate()+6); weeks.push({start:ws,end:we}); cur.setDate(cur.getDate()+7); if(weeks.length>24)break; }
+  const inW=(s,e,w)=>s&&e&&new Date(s)<=w.end&&new Date(e)>=w.start;
+  const fW=d=>`${d.getMonth()+1}/${d.getDate()}`;
+  const catNames=[...new Set(items.map(i=>i.category_name))];
+
+  return (
+    <div>
+      <div className="section-header"><div className="section-title">進度排程（甘特圖）</div></div>
+      {hasData?(
+        <div className="card mb-4" style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',minWidth:'100%',fontSize:11}}>
+            <thead><tr>
+              <th style={{minWidth:120,background:'#F6F6F0',border:'1px solid #E0E0D8',position:'sticky',left:0,zIndex:2}}>工種</th>
+              {weeks.map((w,wi)=><th key={wi} style={{minWidth:75,textAlign:'center',background:'#F6F6F0',border:'1px solid #E0E0D8',fontWeight:600}}>第{wi+1}週<br/><span style={{fontWeight:400,fontSize:10}}>{fW(w.start)}～{fW(w.end)}</span></th>)}
+            </tr></thead>
+            <tbody>
+              <tr style={{background:'#F4F4EE'}}>
+                <td style={{padding:'6px 12px',fontWeight:600,border:'1px solid #E8E8E0',position:'sticky',left:0,background:'#F4F4EE',zIndex:1}}>節日 / 特殊事件</td>
+                {weeks.map((w,wi)=><td key={wi} style={{border:'1px solid #E8E8E0',padding:'3px',verticalAlign:'middle'}}>{events.filter(e=>inW(e.start_date,e.end_date,w)).map(e=><div key={e.id} style={{background:'#CCCCC8',borderRadius:3,padding:'2px 5px',fontSize:10,marginBottom:1,textAlign:'center'}}>{e.name}</div>)}</td>)}
+              </tr>
+              {catNames.map(cat=>{
+                const stages=items.filter(i=>i.category_name===cat);
+                return <tr key={cat}><td style={{padding:'6px 12px',border:'1px solid #E8E8E0',fontWeight:500,position:'sticky',left:0,background:'#fff',zIndex:1}}>{cat}</td>{weeks.map((w,wi)=><td key={wi} style={{border:'1px solid #E8E8E0',padding:'3px',verticalAlign:'middle'}}>{stages.filter(s=>inW(s.start_date,s.end_date,w)).map(s=><div key={s.id} className="gantt-bar">{s.stage_name||cat}</div>)}</td>)}</tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      ):(
+        <div className="card mb-4" style={{padding:'32px',textAlign:'center',color:'#CCC',fontSize:13}}>請在下方設定各工種進退場日期，甘特圖將自動產生</div>
+      )}
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:16,alignItems:'start'}}>
+        <div className="card">
+          <div style={{padding:'12px 16px',borderBottom:'1px solid #F0F0E8',fontWeight:600,fontSize:14}}>工種進退場設定</div>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead><tr style={{background:'#F8F8F2'}}><th style={{padding:'8px 12px',fontSize:12,border:'1px solid #EEE',width:110}}>工程大項</th><th style={{padding:'8px 12px',fontSize:12,border:'1px solid #EEE'}}>階段設定</th></tr></thead>
+            <tbody>
+              {cats.map(cat=>{
+                const stages=items.filter(i=>i.category_name===cat.name);
+                return (
+                  <tr key={cat.id} style={{borderBottom:'1px solid #F0F0E8',verticalAlign:'top'}}>
+                    <td style={{padding:'10px 12px',fontSize:13,border:'1px solid #EEE',fontWeight:500}}>{cat.name}</td>
+                    <td style={{padding:'8px 12px',border:'1px solid #EEE'}}>
+                      {stages.map((s,si)=>(
+                        <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
+                          <span style={{fontSize:11,color:'#888',width:32}}>階段{si+1}</span>
+                          <input type="date" value={s.start_date||''} onChange={e=>updStage(s.id,'start_date',e.target.value)} style={{border:'1px solid #D4D4CE',borderRadius:4,padding:'3px 6px',fontSize:12}}/>
+                          <span style={{color:'#888',fontSize:12}}>～</span>
+                          <input type="date" value={s.end_date||''} onChange={e=>updStage(s.id,'end_date',e.target.value)} style={{border:'1px solid #D4D4CE',borderRadius:4,padding:'3px 6px',fontSize:12}}/>
+                          <IE value={s.stage_name||''} onChange={v=>updStage(s.id,'stage_name',v)} placeholder="備註" style={{border:'1px solid #D4D4CE',borderRadius:4,padding:'3px 8px',fontSize:12,flex:1,minWidth:70}}/>
+                          <button style={{background:'#FFF0F0',color:'#8B2E2E',border:'1px solid #EEC0C0',borderRadius:4,padding:'3px 8px',fontSize:12,cursor:'pointer'}} onClick={()=>delStage(s.id)}>刪</button>
+                        </div>
+                      ))}
+                      <button onClick={()=>addStage(cat.name)} style={{border:'1px dashed #C8A96E',borderRadius:6,padding:'4px 14px',fontSize:12,color:'#C8A96E',background:'transparent',cursor:'pointer',marginTop:stages.length?2:0}}>新增進場階段</button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!cats.length&&<tr><td colSpan={2} style={{padding:'20px',textAlign:'center',color:'#CCC',fontSize:12}}>請先在「工程明細」建立大項</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card">
+          <div style={{padding:'12px 16px',borderBottom:'1px solid #F0F0E8',fontWeight:600,fontSize:14}}>特殊事件 / 假日</div>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead><tr style={{background:'#F8F8F2'}}><th style={{padding:'8px 10px',fontSize:12,fontWeight:600}}>區間</th><th style={{padding:'8px 10px',fontSize:12,fontWeight:600}}>名稱</th><th style={{width:40}}></th></tr></thead>
+            <tbody>
+              {events.map(e=><tr key={e.id} style={{borderBottom:'1px solid #F4F4EE'}}><td style={{padding:'8px 10px',fontSize:12}}>{fmtDate(e.start_date)}～{fmtDate(e.end_date)}</td><td style={{padding:'8px 10px',fontSize:12}}>{e.name}</td><td style={{padding:'8px 10px',textAlign:'center'}}><button style={{background:'#FFF0F0',color:'#8B2E2E',border:'1px solid #EEC0C0',borderRadius:4,padding:'2px 8px',fontSize:12,cursor:'pointer'}} onClick={()=>delEvent(e.id)}>刪</button></td></tr>)}
+              {!events.length&&<tr><td colSpan={3} style={{padding:14,color:'#CCC',fontSize:12,textAlign:'center'}}>尚無特殊事件</td></tr>}
+            </tbody>
+          </table>
+          {showEvt?(
+            <div style={{padding:'12px 14px',borderTop:'1px solid #F0F0E8',display:'flex',flexDirection:'column',gap:8}}>
+              <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                <input type="date" value={ne.start_date} onChange={e=>setNe(p=>({...p,start_date:e.target.value}))} style={{border:'1px solid #D4D4CE',borderRadius:4,padding:'4px 6px',fontSize:12,flex:1}}/>
+                <span style={{fontSize:12,color:'#888'}}>～</span>
+                <input type="date" value={ne.end_date} onChange={e=>setNe(p=>({...p,end_date:e.target.value}))} style={{border:'1px solid #D4D4CE',borderRadius:4,padding:'4px 6px',fontSize:12,flex:1}}/>
+              </div>
+              <input value={ne.name} onChange={e=>setNe(p=>({...p,name:e.target.value}))} placeholder="事件名稱" style={{border:'1px solid #D4D4CE',borderRadius:4,padding:'4px 8px',fontSize:12,width:'100%'}} onKeyDown={e=>e.key==='Enter'&&addEvent()}/>
+              <div style={{display:'flex',gap:8}}><button className="btn btn-primary btn-sm" style={{flex:1}} onClick={addEvent}>確認新增</button><button className="btn btn-ghost btn-sm" onClick={()=>setShowEvt(false)}>取消</button></div>
+            </div>
+          ):(
+            <div style={{padding:'10px 14px',borderTop:'1px solid #F0F0E8'}}>
+              <button onClick={()=>setShowEvt(true)} style={{border:'1px dashed #C8A96E',borderRadius:6,padding:'5px 14px',fontSize:12,color:'#C8A96E',background:'transparent',cursor:'pointer',width:'100%'}}>手動新增事件</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAYMENT TAB
+══════════════════════════════════════════ */
+function PaymentTab({ project }) {
+  const [stages, setStages] = useDB('pays_'+project.id, []);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState({name:'',amount:0,paid_amount:0,paid_date:'',is_current:false});
+
+  const tAmt = stages.reduce((s,x)=>s+(x.amount||0),0);
+  const tPaid = stages.reduce((s,x)=>s+(x.paid_amount||0),0);
+  const pct = tAmt?Math.min(100,Math.round(tPaid/tAmt*100)):0;
+  const stOf = s => { if(!s.amount) return {label:'未設定',color:'#AAA'}; if((s.paid_amount||0)>=s.amount) return {label:'已結清',color:'#3A5240'}; if((s.paid_amount||0)>0) return {label:'部分付款',color:'#C8A96E'}; return {label:'未付款',color:'#888'}; };
+
+  return (
+    <div>
+      <div className="section-header">
+        <div className="section-title">付款管理</div>
+        <button className="btn btn-primary btn-sm" onClick={()=>setStages(p=>[...p,{id:nid(),name:'新期款',amount:0,paid_amount:0,paid_date:'',is_current:false,sort_order:p.length}])}>＋ 新增期款</button>
+      </div>
+      <div className="grid-3 mb-4">
+        <div className="stat-card"><div className="stat-val">{fmt(tAmt)}</div><div className="stat-lbl">合約總金額</div></div>
+        <div className="stat-card"><div className="stat-val" style={{color:'#C8A96E'}}>{fmt(tPaid)}</div><div className="stat-lbl">已收金額</div></div>
+        <div className="stat-card"><div className="stat-val" style={{color:'#8B2E2E'}}>{fmt(tAmt-tPaid)}</div><div className="stat-lbl">待收金額</div></div>
+      </div>
+      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:20}}>
+        <span style={{fontSize:12,color:'#888',flexShrink:0}}>收款進度</span>
+        <div style={{flex:1}}><div className="pb-wrap"><div className="pb-fill" style={{width:pct+'%'}}/></div></div>
+        <span style={{fontSize:13,fontWeight:600,color:'#C8A96E',flexShrink:0}}>{pct}%</span>
+      </div>
+      {stages.map(s=>{
+        const st=stOf(s); const p2=s.amount?Math.min(100,Math.round((s.paid_amount||0)/s.amount*100)):0;
+        return (
+          <div key={s.id} className={`pay-stage ${s.is_current?'current':''}`}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:14}}>{s.name}{s.is_current&&<span style={{fontSize:11,color:'#C8A96E',fontWeight:400,marginLeft:6}}>（本期）</span>}</div>
+                <div style={{fontSize:12,color:'#888',marginTop:2}}>應收：{fmt(s.amount||0)}　已收：{fmt(s.paid_amount||0)}{s.paid_date?'　付款日：'+fmtDate(s.paid_date):''}</div>
+              </div>
+              <span style={{fontSize:12,fontWeight:600,color:st.color,flexShrink:0}}>{st.label}</span>
+              <button className="btn-icon" onClick={()=>{setForm({...s});setEditId(s.id);}} style={{fontSize:12,color:'#AAA'}}>✏</button>
+              <button className="btn-icon" onClick={()=>{if(!confirm('確定刪除？'))return;setStages(p=>p.filter(x=>x.id!==s.id));}} style={{fontSize:11,color:'#EEE'}}>✕</button>
+            </div>
+            <div className="pb-wrap"><div className="pb-fill" style={{width:p2+'%'}}/></div>
+          </div>
+        );
+      })}
+      {!stages.length&&<div style={{textAlign:'center',padding:40,color:'#CCC'}}>尚無付款期數，請點「新增期款」建立</div>}
+
+      <Modal open={!!editId} title="編輯付款期數" onClose={()=>setEditId(null)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setEditId(null)}>取消</button><button className="btn btn-primary" onClick={()=>{ if(form.is_current) setStages(p=>p.map(x=>({...x,is_current:false}))); setStages(p=>p.map(x=>x.id===editId?{...x,...form}:x)); setEditId(null); toast('付款資訊已更新'); }}>儲存</button></>}>
+        <div className="form-group"><label className="form-label">期數名稱</label><IInput value={form.name} onChange={v=>setForm(p=>({...p,name:v}))}/></div>
+        <div className="grid-2">
+          <div className="form-group"><label className="form-label">應收金額</label><input className="form-input" type="number" value={form.amount||0} onChange={e=>setForm(p=>({...p,amount:+e.target.value}))}/></div>
+          <div className="form-group"><label className="form-label">已收金額</label><input className="form-input" type="number" value={form.paid_amount||0} onChange={e=>setForm(p=>({...p,paid_amount:+e.target.value}))}/></div>
+        </div>
+        <div className="grid-2">
+          <div className="form-group"><label className="form-label">付款日期</label><input className="form-input" type="date" value={form.paid_date||''} onChange={e=>setForm(p=>({...p,paid_date:e.target.value}))}/></div>
+          <div className="form-group" style={{justifyContent:'flex-end',paddingTop:18}}>
+            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13}}>
+              <input type="checkbox" checked={!!form.is_current} onChange={e=>setForm(p=>({...p,is_current:e.target.checked}))} style={{accentColor:'#C8A96E'}}/> 標記為本期
+            </label>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   TODOS TAB
+══════════════════════════════════════════ */
+function TodosTab({ project }) {
+  const [todos, setTodos] = useDB('todos_'+project.id, []);
+  const [inp, setInp] = useState({general:'',site:'',purchase:''});
+  const add = type => { const c=inp[type].trim(); if(!c) return; setTodos(p=>[...p,{id:nid(),content:c,todo_type:type,is_done:false,created_at:todayStr()}]); setInp(p=>({...p,[type]:''})); };
+  const tog = id => setTodos(p=>p.map(t=>t.id===id?{...t,is_done:!t.is_done}:t));
+  const del = id => setTodos(p=>p.filter(t=>t.id!==id));
+  const cols=[{type:'general',label:'一般待辦'},{type:'site',label:'現場待辦'},{type:'purchase',label:'待採購清單'}];
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16,alignItems:'start'}}>
+      {cols.map(({type,label})=>{
+        const list=todos.filter(t=>t.todo_type===type);
+        const pend=list.filter(t=>!t.is_done); const done=list.filter(t=>t.is_done);
+        return (
+          <div key={type} style={{background:'#fff',border:'1px solid #E4E4DC',borderRadius:10,padding:16,minHeight:200}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>{label}</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <input className="form-input" style={{flex:1,fontSize:13}} placeholder="新增..." value={inp[type]} onChange={e=>setInp(p=>({...p,[type]:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&add(type)}/>
+              <button className="btn btn-primary btn-sm" onClick={()=>add(type)}>新增</button>
+            </div>
+            {pend.map(t=>(
+              <div key={t.id} className="todo-row">
+                <input type="checkbox" checked={false} onChange={()=>tog(t.id)} style={{width:16,height:16,accentColor:'#C8A96E',cursor:'pointer',flexShrink:0,marginTop:2}}/>
+                <span style={{flex:1,fontSize:13}}>{t.content}</span>
+                <button className="btn-icon" style={{color:'#DDD',fontSize:12}} onClick={()=>del(t.id)}>✕</button>
+              </div>
+            ))}
+            {done.length>0&&<div style={{marginTop:8,opacity:.45}}>{done.map(t=>(
+              <div key={t.id} className="todo-row">
+                <input type="checkbox" checked={true} onChange={()=>tog(t.id)} style={{width:16,height:16,accentColor:'#C8A96E',cursor:'pointer',flexShrink:0,marginTop:2}}/>
+                <span style={{flex:1,fontSize:13,textDecoration:'line-through',color:'#888'}}>{t.content}</span>
+                <button className="btn-icon" style={{color:'#DDD',fontSize:12}} onClick={()=>del(t.id)}>✕</button>
+              </div>
+            ))}</div>}
+            {!list.length&&<div style={{color:'#CCC',fontSize:12,textAlign:'center',padding:'16px 0'}}>尚無待辦</div>}
+            <div style={{marginTop:8,fontSize:11,color:'#999',textAlign:'right'}}>未完成 {pend.length}｜已完成 {done.length}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   SITE LOG TAB
+══════════════════════════════════════════ */
+function SiteLogTab({ project }) {
+  const [logs, setLogs] = useDB('sitelog_'+project.id, []);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({log_date:todayStr(),weather:'晴天',workers:'',content:''});
+  const W=['晴天','多雲','陰天','下雨','颱風'];
+  const upd=(id,f,v)=>setLogs(p=>p.map(l=>l.id===id?{...l,[f]:v}:l));
+  return (
+    <div>
+      <div className="section-header"><div className="section-title">施工日誌</div><button className="btn btn-primary btn-sm" onClick={()=>setShowAdd(true)}>＋ 新增今日日誌</button></div>
+      {logs.map(l=>(
+        <div key={l.id} className="log-card">
+          <div className="log-hdr">
+            <input type="date" value={l.log_date} style={{border:'none',fontWeight:600,fontSize:14,background:'transparent'}} onChange={e=>upd(l.id,'log_date',e.target.value)}/>
+            <select value={l.weather} onChange={e=>upd(l.id,'weather',e.target.value)} style={{border:'1px solid #E4E4DC',borderRadius:4,padding:'2px 6px',fontSize:12,background:'#FAFAF6'}}>
+              {W.map(w=><option key={w}>{w}</option>)}
+            </select>
+            <button className="btn btn-xs" style={{background:'#FFF0F0',color:'#8B2E2E',border:'1px solid #EEC0C0',borderRadius:4,marginLeft:'auto'}} onClick={()=>setLogs(p=>p.filter(x=>x.id!==l.id))}>刪除</button>
+          </div>
+          <div className="form-group mb-2"><label className="form-label">出勤工班與人數</label><IInput value={l.workers||''} onChange={v=>upd(l.id,'workers',v)} placeholder="例：木作工班 3人"/></div>
+          <div className="form-group"><label className="form-label">今日施工內容 / 備註</label><ITextarea value={l.content||''} onChange={v=>upd(l.id,'content',v)}/></div>
+        </div>
+      ))}
+      {!logs.length&&<div style={{textAlign:'center',padding:40,color:'#CCC',fontSize:13}}>尚無施工日誌</div>}
+      <Modal open={showAdd} title="新增施工日誌" onClose={()=>setShowAdd(false)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>取消</button><button className="btn btn-primary" onClick={()=>{setLogs(p=>[{id:nid(),...form},...p]);toast('已新增日誌');setShowAdd(false);setForm({log_date:todayStr(),weather:'晴天',workers:'',content:''});}}>新增</button></>}>
+        <div className="grid-2">
+          <div className="form-group"><label className="form-label">日期</label><input className="form-input" type="date" value={form.log_date} onChange={e=>setForm(p=>({...p,log_date:e.target.value}))}/></div>
+          <div className="form-group"><label className="form-label">天氣</label><select className="form-select" value={form.weather} onChange={e=>setForm(p=>({...p,weather:e.target.value}))}>{W.map(w=><option key={w}>{w}</option>)}</select></div>
+        </div>
+        <div className="form-group"><label className="form-label">出勤工班與人數</label><IInput value={form.workers} onChange={v=>setForm(p=>({...p,workers:v}))} placeholder="例：木作工班 3人"/></div>
+        <div className="form-group"><label className="form-label">今日施工內容</label><ITextarea value={form.content} onChange={v=>setForm(p=>({...p,content:v}))}/></div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   MEETING TAB
+══════════════════════════════════════════ */
+function MeetingTab({ project }) {
+  const [recs, setRecs] = useDB('mtg_'+project.id, []);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({meeting_date:todayStr(),meeting_time:'10:00',location:'',attendees:''});
+  const [newItm, setNewItm] = useState({});
+  const updRec=(id,f,v)=>setRecs(p=>p.map(r=>r.id===id?{...r,[f]:v}:r));
+  const addItm=rid=>{ const c=(newItm[rid]||'').trim(); if(!c) return; setRecs(p=>p.map(r=>r.id===rid?{...r,items:[...(r.items||[]),{id:nid(),content:c,is_done:false}]}:r)); setNewItm(p=>({...p,[rid]:''})); };
+  const togItm=(rid,iid)=>setRecs(p=>p.map(r=>r.id===rid?{...r,items:(r.items||[]).map(i=>i.id===iid?{...i,is_done:!i.is_done}:i)}:r));
+  const delItm=(rid,iid)=>setRecs(p=>p.map(r=>r.id===rid?{...r,items:(r.items||[]).filter(i=>i.id!==iid)}:r));
+  return (
+    <div>
+      <div className="section-header"><div className="section-title">會議記錄</div><button className="btn btn-primary btn-sm" onClick={()=>setShowAdd(true)}>＋ 新增會議記錄</button></div>
+      {recs.map(r=>(
+        <div key={r.id} className="log-card mb-4">
+          <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
+            <input type="date" className="form-input" style={{width:140}} value={r.meeting_date} onChange={e=>updRec(r.id,'meeting_date',e.target.value)}/>
+            <input type="time" className="form-input" style={{width:110}} value={r.meeting_time||'10:00'} onChange={e=>updRec(r.id,'meeting_time',e.target.value)}/>
+            <button className="btn btn-xs" style={{background:'#FFF0F0',color:'#8B2E2E',border:'1px solid #EEC0C0',borderRadius:4,marginLeft:'auto'}} onClick={()=>setRecs(p=>p.filter(x=>x.id!==r.id))}>刪除此記錄</button>
+          </div>
+          <div className="grid-2 mb-3">
+            <div className="form-group"><label className="form-label">開會地點</label><IInput value={r.location||''} onChange={v=>updRec(r.id,'location',v)} placeholder="例：工地現場 / 公司"/></div>
+            <div className="form-group"><label className="form-label">參與人員</label><IInput value={r.attendees||''} onChange={v=>updRec(r.id,'attendees',v)} placeholder="例：業主陳先生"/></div>
+          </div>
+          <div className="form-label mb-2">決議事項與討論內容</div>
+          {(r.items||[]).map((it,idx)=>(
+            <div key={it.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:'1px solid #F4F4EE'}}>
+              <span style={{color:'#888',fontSize:12,width:20}}>{idx+1}.</span>
+              <input type="checkbox" checked={!!it.is_done} onChange={()=>togItm(r.id,it.id)} style={{accentColor:'#C8A96E',width:15,height:15,flexShrink:0}}/>
+              <span style={{flex:1,fontSize:13,color:it.is_done?'#AAA':'#2E2E2E',textDecoration:it.is_done?'line-through':'none'}}>{it.content}</span>
+              <button className="btn-icon" style={{color:'#DDD',fontSize:12}} onClick={()=>delItm(r.id,it.id)}>✕</button>
+            </div>
+          ))}
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <input className="form-input" style={{flex:1}} placeholder="輸入討論事項或決議..." value={newItm[r.id]||''} onChange={e=>setNewItm(p=>({...p,[r.id]:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addItm(r.id)}/>
+            <button className="btn btn-ghost btn-sm" onClick={()=>addItm(r.id)}>新增一筆</button>
+          </div>
+        </div>
+      ))}
+      {!recs.length&&<div style={{textAlign:'center',padding:40,color:'#CCC',fontSize:13}}>尚無會議記錄</div>}
+      <Modal open={showAdd} title="新增會議記錄" onClose={()=>setShowAdd(false)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>取消</button><button className="btn btn-primary" onClick={()=>{setRecs(p=>[{id:nid(),...form,items:[]},...p]);toast('已新增會議記錄');setShowAdd(false);setForm({meeting_date:todayStr(),meeting_time:'10:00',location:'',attendees:''});}}>新增</button></>}>
+        <div className="grid-2">
+          <div className="form-group"><label className="form-label">開會日期</label><input className="form-input" type="date" value={form.meeting_date} onChange={e=>setForm(p=>({...p,meeting_date:e.target.value}))}/></div>
+          <div className="form-group"><label className="form-label">開會時間</label><input className="form-input" type="time" value={form.meeting_time} onChange={e=>setForm(p=>({...p,meeting_time:e.target.value}))}/></div>
+        </div>
+        <div className="form-group"><label className="form-label">開會地點</label><IInput value={form.location} onChange={v=>setForm(p=>({...p,location:v}))}/></div>
+        <div className="form-group"><label className="form-label">參與人員</label><IInput value={form.attendees} onChange={v=>setForm(p=>({...p,attendees:v}))}/></div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PROJECT DETAIL
+══════════════════════════════════════════ */
+const PROJ_TABS = [
+  {key:'summary',label:'專案總覽'},{key:'flow',label:'專案流程'},
+  {key:'work',label:'工程明細'},{key:'purchase',label:'採購明細'},
+  {key:'schedule',label:'進度排程'},{key:'payment',label:'付款管理'},
+  {key:'todos',label:'待辦事項'},{key:'sitelog',label:'施工日誌'},
+  {key:'meeting',label:'會議記錄'},
+];
+
+function ProjectDetail({ project, onUpdate, onBack }) {
+  const [tab, setTab] = useState('summary');
+  const todos = lsGet('todos_'+project.id,[]).filter(t=>!t.is_done);
+  const content = useMemo(()=>{
+    if(tab==='summary')  return <SummaryTab project={project} onUpdate={onUpdate}/>;
+    if(tab==='flow')     return <FlowTab project={project}/>;
+    if(tab==='work')     return <WorkTab project={project}/>;
+    if(tab==='purchase') return <PurchaseTab project={project}/>;
+    if(tab==='schedule') return <ScheduleTab project={project}/>;
+    if(tab==='payment')  return <PaymentTab project={project}/>;
+    if(tab==='todos')    return <TodosTab project={project}/>;
+    if(tab==='sitelog')  return <SiteLogTab project={project}/>;
+    if(tab==='meeting')  return <MeetingTab project={project}/>;
+    return null;
+  },[tab, project]);
+  return (
+    <div className="proj-detail">
+      <div className="proj-topbar">
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#1A1A18',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{project.name}</div>
+          <div style={{fontSize:11,color:'#888',marginTop:1}}>{[project.client_name, project.address?.slice(0,24)].filter(Boolean).join(' · ')}</div>
+        </div>
+        <span className={`badge ${STATUS_BADGE[project.status]||'badge-active'}`} style={{flexShrink:0}}>{STATUS_LABEL[project.status]||'進行中'}</span>
+        {todos.length>0&&<span style={{fontSize:12,color:'#8B2E2E',flexShrink:0}}>⚠ {todos.length} 待辦</span>}
+        <button className="btn btn-ghost btn-sm" onClick={onBack}>← 返回</button>
+      </div>
+      <div className="tab-bar">{PROJ_TABS.map(t=><div key={t.key} className={`tab-item ${tab===t.key?'active':''}`} onClick={()=>setTab(t.key)}>{t.label}</div>)}</div>
+      <div className="tab-content">{content}</div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PROJECT LIST
+══════════════════════════════════════════ */
+function ProjectList({ onSelect }) {
+  const [projects, setProjects] = useDB('projects', []);
+  const [showNew, setShowNew] = useState(false);
+  const defForm = {name:'',client_name:'',contact_person:'',contact_phone:'',address:'',project_date:todayStr(),area_sqm:'',status:'active',notes:'',management_fee_rate:7,design_fee_per_sqm:0,tax_enabled:false,tax_rate:5};
+  const [form, setForm] = useState(defForm);
+  const create = () => {
+    if (!form.name.trim()) { toast('請輸入專案名稱','error'); return; }
+    const p={id:nid(),...form,created_at:todayStr(),updated_at:todayStr()};
+    setProjects(prev=>[p,...prev]); setShowNew(false); setForm(defForm); toast('專案已建立：'+p.name);
+  };
+  const groups = [{s:'active',l:'進行中'},{s:'paused',l:'暫停'},{s:'closed',l:'已結案'}];
+  return (
+    <div>
+      <div className="section-header">
+        <div className="section-title">專案庫</div>
+        <button className="btn btn-primary" onClick={()=>setShowNew(true)}>＋ 新建專案</button>
+      </div>
+      {groups.map(({s,l})=>{
+        const projs=projects.filter(p=>p.status===s); if(!projs.length) return null;
+        return (
+          <div key={s} style={{marginBottom:28}}>
+            <div style={{fontSize:12,fontWeight:600,color:'#888',marginBottom:10,textTransform:'uppercase',letterSpacing:'.08em'}}>{l}（{projs.length}）</div>
+            <div className="project-grid">
+              {projs.map(p=>{
+                const items=lsGet('witems_'+p.id,[]);
+                const total=items.reduce((s,i)=>s+i.unit_price*i.quantity,0);
+                const todos=lsGet('todos_'+p.id,[]).filter(t=>!t.is_done);
+                return (
+                  <div key={p.id} className="project-card" onClick={()=>onSelect(p)}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                      <div className="p-card-name">{p.name}</div>
+                      <span className={`badge ${STATUS_BADGE[p.status]}`}>{STATUS_LABEL[p.status]}</span>
+                    </div>
+                    <div className="p-card-client">👤 {p.client_name||'—'}</div>
+                    <div className="p-card-meta">
+                      {p.address&&<span>📍 {p.address.slice(0,18)}</span>}
+                      {total>0&&<span>💰 {fmt(total)}</span>}
+                      {todos.length>0&&<span style={{color:'#C8A96E'}}>⚠ {todos.length} 待辦</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      {!projects.length&&(
+        <div style={{textAlign:'center',padding:'60px 20px',color:'#CCC'}}>
+          <div style={{fontSize:44,marginBottom:16}}>🏗</div>
+          <div style={{fontSize:15,marginBottom:8,color:'#AAA'}}>尚無專案</div>
+          <button className="btn btn-gold" onClick={()=>setShowNew(true)}>＋ 建立第一個專案</button>
+        </div>
+      )}
+      <Modal open={showNew} title="建立新專案" onClose={()=>setShowNew(false)}
+        footer={<><button className="btn btn-ghost" onClick={()=>setShowNew(false)}>取消</button><button className="btn btn-primary" onClick={create}>建立</button></>}>
+        <div className="form-group"><label className="form-label">專案名稱 *</label><IInput value={form.name} onChange={v=>setForm(p=>({...p,name:v}))} placeholder="例：台北信義區住宅翻新案"/></div>
+        <div className="grid-2">
+          <div className="form-group"><label className="form-label">客戶名稱</label><IInput value={form.client_name} onChange={v=>setForm(p=>({...p,client_name:v}))}/></div>
+          <div className="form-group"><label className="form-label">聯絡人</label><IInput value={form.contact_person} onChange={v=>setForm(p=>({...p,contact_person:v}))}/></div>
+        </div>
+        <div className="grid-2">
+          <div className="form-group"><label className="form-label">聯絡電話</label><IInput value={form.contact_phone} onChange={v=>setForm(p=>({...p,contact_phone:v}))}/></div>
+          <div className="form-group"><label className="form-label">開始日期</label><input className="form-input" type="date" value={form.project_date} onChange={e=>setForm(p=>({...p,project_date:e.target.value}))}/></div>
+        </div>
+        <div className="form-group"><label className="form-label">施工地址</label><IInput value={form.address} onChange={v=>setForm(p=>({...p,address:v}))}/></div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ALL TODOS PAGE
+══════════════════════════════════════════ */
+function AllTodosPage() {
+  const [projects] = useDB('projects', []);
+  const all = projects.flatMap(p=>lsGet('todos_'+p.id,[]).filter(t=>!t.is_done).map(t=>({...t,_proj:p.name})));
+  return (
+    <div>
+      <div className="section-header mb-4"><div className="section-title">全部未完成待辦（{all.length} 項）</div></div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:14}}>
+        {['general','site','purchase'].map(type=>{
+          const lb={general:'一般待辦',site:'現場待辦',purchase:'採購待辦'}[type];
+          const its=all.filter(t=>t.todo_type===type);
+          return (
+            <div key={type} className="card">
+              <div className="card-header"><span className="card-title">{lb}（{its.length}）</span></div>
+              <div className="card-body" style={{padding:'10px 14px'}}>
+                {its.map(t=>(
+                  <div key={t.id} style={{padding:'7px 0',borderBottom:'1px solid #F4F4EE',fontSize:12}}>
+                    <div style={{color:'#C8A96E',fontSize:10,marginBottom:2}}>{t._proj}</div>
+                    <div>{t.content}</div>
+                  </div>
+                ))}
+                {!its.length&&<div style={{fontSize:12,color:'#CCC',padding:'8px 0'}}>太棒了！無待辦 🎉</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   APP ROOT
+══════════════════════════════════════════ */
+function App() {
+  const [projects, setProjects] = useDB('projects', []);
+  const [selected, setSelected] = useState(null);
+  const [view, setView] = useState('projects');
+  const [sbOpen, setSbOpen] = useState(false);
+
+  const handleUpdate = updated => {
+    setProjects(p=>p.map(x=>x.id===updated.id?updated:x));
+    setSelected(updated);
+  };
+  const navTo = v => { setView(v); setSelected(null); setSbOpen(false); };
+  const goProject = p => { setSelected(p); setSbOpen(false); };
+  const goBack = () => { setSelected(null); setView('projects'); };
+
+  const SbItem = ({label,icon,active,onClick}) => (
+    <div className={`sb-item ${active?'active':''}`} onClick={onClick}>
+      <span className="sb-icon">{icon}</span><span>{label}</span>
+    </div>
+  );
+
+  return (
+    <div className="app-layout">
+      <div className={`sb-overlay ${sbOpen?'open':''}`} onClick={()=>setSbOpen(false)}/>
+
+      <div className={`sidebar ${sbOpen?'open':''}`}>
+        <div className="sidebar-logo" onClick={goBack}>
+          <div className="sb-mark">SQ</div>
+          <div className="sb-name">SQ Space</div>
+        </div>
+
+        <div style={{padding:'8px 0'}}>
+          {selected ? (
+            <>
+              <div style={{padding:'8px 12px'}}>
+                <button className="btn btn-ghost btn-sm" style={{width:'100%',justifyContent:'center',fontSize:11,color:'#666',borderColor:'#2E2E2A',background:'transparent'}} onClick={goBack}>← 返回專案庫</button>
+              </div>
+              <div style={{padding:'4px 14px 6px',fontSize:11,color:'#444',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{selected.name}</div>
+              <div className="sb-divider"/>
+              {PROJ_TABS.map(t=><SbItem key={t.key} label={t.label} icon="" active={false} onClick={()=>{}}/>)}
+            </>
+          ) : (
+            <>
+              <SbItem label="專案庫" icon="🏗" active={view==='projects'} onClick={()=>navTo('projects')}/>
+              <SbItem label="全部待辦" icon="✅" active={view==='todos'} onClick={()=>navTo('todos')}/>
+            </>
+          )}
+        </div>
+
+        <div className="sb-user">
+          <div className="sb-avatar">SQ</div>
+          <div style={{flex:1,overflow:'hidden'}}>
+            <div style={{fontSize:12,color:'#CCC',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>SQ Space</div>
+            <div style={{fontSize:10,color:'#444'}}>個人工作台</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="main-content">
+        {selected ? (
+          <ProjectDetail project={selected} onUpdate={handleUpdate} onBack={goBack}/>
+        ) : (
+          <>
+            <div className="topbar">
+              <button className="hamburger" onClick={()=>setSbOpen(o=>!o)}><span/><span/><span/></button>
+              <div className="topbar-title">{view==='projects'?'專案庫':view==='todos'?'全部待辦事項':'SQ Space'}</div>
+              <div style={{fontSize:12,color:'#AAA',marginLeft:'auto'}}>SQ Space</div>
+            </div>
+            <div className="page-body">
+              {view==='projects'&&<ProjectList onSelect={goProject}/>}
+              {view==='todos'&&<AllTodosPage/>}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
