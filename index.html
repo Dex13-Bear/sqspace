@@ -3204,11 +3204,82 @@ function IGPage() {
 /* ══════════════════════════════════════════
    APP ROOT
 ══════════════════════════════════════════ */
+/* ══ 帳號系統 ══ */
+const ACCOUNTS = [
+  { username:'HC',   password:'SQ1234', displayName:'HC', role:'admin' },
+  { username:'User', password:'SQ888',  displayName:'User', role:'staff' },
+];
+
+function LoginPage({ onLogin }) {
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [err, setErr] = useState('');
+  const [showPass, setShowPass] = useState(false);
+
+  const login = () => {
+    const acc = ACCOUNTS.find(a => a.username===user && a.password===pass);
+    if (acc) {
+      lsSet('session', { username: acc.username, displayName: acc.displayName, role: acc.role, ts: Date.now() });
+      onLogin(acc);
+    } else {
+      setErr('帳號或密碼錯誤');
+      setTimeout(()=>setErr(''), 2500);
+    }
+  };
+
+  return (
+    <div style={{minHeight:'100vh',background:'#1A1A18',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{background:'#fff',borderRadius:12,padding:'44px 40px',width:'100%',maxWidth:360,boxShadow:'0 8px 40px rgba(0,0,0,.3)'}}>
+        <div style={{marginBottom:32,textAlign:'center'}}>
+          <div style={{width:52,height:52,background:'#C8A96E',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:700,color:'#1A1A18',margin:'0 auto 16px'}}>無</div>
+          <div style={{fontSize:18,fontWeight:700,color:'#1A1A18',marginBottom:4}}>無澀空間</div>
+          <div style={{fontSize:12,color:'#AAA',letterSpacing:'.1em'}}>ARTRIUM</div>
+        </div>
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:12,color:'#555',fontWeight:500,display:'block',marginBottom:4}}>帳號</label>
+          <input className="form-input" value={user} onChange={e=>setUser(e.target.value)}
+            placeholder="輸入帳號" autoComplete="username"
+            onKeyDown={e=>e.key==='Enter'&&login()}/>
+        </div>
+        <div style={{marginBottom:20,position:'relative'}}>
+          <label style={{fontSize:12,color:'#555',fontWeight:500,display:'block',marginBottom:4}}>密碼</label>
+          <input className="form-input" type={showPass?'text':'password'} value={pass}
+            onChange={e=>setPass(e.target.value)} placeholder="輸入密碼" autoComplete="current-password"
+            onKeyDown={e=>e.key==='Enter'&&login()}/>
+          <button onClick={()=>setShowPass(o=>!o)} style={{position:'absolute',right:10,top:26,background:'none',border:'none',color:'#AAA',cursor:'pointer',fontSize:12}}>
+            {showPass?'隱藏':'顯示'}
+          </button>
+        </div>
+        {err&&<div style={{fontSize:12,color:'#8B2E2E',background:'#FFF0F0',border:'1px solid #EEC0C0',borderRadius:6,padding:'8px 12px',marginBottom:14,textAlign:'center'}}>{err}</div>}
+        <button onClick={login} style={{width:'100%',padding:'11px',background:'#1A1A18',color:'#fff',border:'none',borderRadius:7,fontSize:14,fontWeight:600,cursor:'pointer',transition:'background .15s'}}
+          onMouseOver={e=>e.currentTarget.style.background='#333'}
+          onMouseOut={e=>e.currentTarget.style.background='#1A1A18'}>
+          登入
+        </button>
+        <div style={{marginTop:16,fontSize:11,color:'#CCC',textAlign:'center'}}>無澀空間 專案管理系統</div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [projects, setProjects] = useDB('projects', []);
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState('projects');
   const [sbOpen, setSbOpen] = useState(false);
+
+  // ── 登入狀態 ──
+  const [session, setSession] = useState(() => {
+    const s = lsGet('session', null);
+    if (!s) return null;
+    // Session expires after 7 days
+    if (Date.now() - s.ts > 7 * 24 * 3600 * 1000) { lsSet('session', null); return null; }
+    return s;
+  });
+
+  if (!session) return <LoginPage onLogin={s => setSession(s)}/>;
+
+  const logout = () => { lsSet('session', null); setSession(null); setSelected(null); setView('projects'); };
 
   const handleUpdate = updated => {
     setProjects(p=>p.map(x=>x.id===updated.id?updated:x));
@@ -3254,11 +3325,12 @@ function App() {
         </div>
 
         <div className="sb-user">
-          <div className="sb-avatar">無</div>
+          <div className="sb-avatar" style={{background:'#C8A96E',color:'#1A1A18',fontSize:11,fontWeight:700}}>{session.displayName[0].toUpperCase()}</div>
           <div style={{flex:1,overflow:'hidden'}}>
-            <div style={{fontSize:12,color:'#CCC',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>無澀空間</div>
-            <div style={{fontSize:10,color:'#444'}}>個人工作台</div>
+            <div style={{fontSize:12,color:'#CCC',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{session.displayName}</div>
+            <div style={{fontSize:10,color:'#555'}}>{session.role==='admin'?'管理員':'工作人員'}</div>
           </div>
+          <button onClick={logout} title="登出" style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:13,padding:'4px',flexShrink:0}} onMouseOver={e=>e.currentTarget.style.color='#AAA'} onMouseOut={e=>e.currentTarget.style.color='#555'}>⎋</button>
         </div>
       </div>
 
