@@ -1152,36 +1152,59 @@ function generateClientQuote(project, cats, items) {
   const invoiceNo = date.replace(/\//g,'').slice(0,6)+'-'+String(Math.floor(Math.random()*900)+100);
 
   const rowsHtml = [
-    ...cats.map((cat,i) => {
+    ...cats.map((cat, ci) => {
+      const catItems = items.filter(i=>i.category_id===cat.id);
       const t = catTotal(cat.id);
       const isPurchase = cat.name.includes('採購');
-      return `<tr>
-        <td style="padding:14px 0;border-bottom:1px solid #CCC;font-size:13px;color:#555;width:50px">0${i+1}</td>
-        <td style="padding:14px 0;border-bottom:1px solid #CCC;font-size:13px;color:#555;width:60px;text-align:center">1</td>
-        <td style="padding:14px 0;border-bottom:1px solid #CCC">
-          <div style="font-size:13px;color:#222;font-weight:500">${cat.name}</div>
-          ${isPurchase?'<div style="font-size:11px;color:#999;margin-top:2px">採購項目不收管理費</div>':''}
+      const catLetter = String.fromCharCode(65+ci);
+
+      // Category header row
+      const headerRow = `<tr>
+        <td colspan="4" style="padding:14px 0 6px;border-top:${ci===0?'none':'1.5px solid #999'}">
+          <div style="font-size:13px;font-weight:700;color:#1A1A18;letter-spacing:.02em">${catLetter}. ${cat.name}${isPurchase?'<span style="font-size:10px;color:#999;font-weight:400;margin-left:8px">採購項目不收管理費</span>':''}</div>
         </td>
-        <td style="padding:14px 0;border-bottom:1px solid #CCC;text-align:right;font-size:13px;color:#222;font-weight:500;white-space:nowrap">$ ${t.toLocaleString()}</td>
       </tr>`;
+
+      // Line item rows
+      const itemRows = catItems.map((item, ii) => {
+        const lineTotal = item.unit_price * item.quantity;
+        return `<tr>
+          <td style="padding:7px 0;border-bottom:1px solid #EAEAE0;font-size:12px;color:#AAA;width:50px;padding-left:12px">${ii+1}</td>
+          <td style="padding:7px 0;border-bottom:1px solid #EAEAE0;font-size:12px;color:#666;text-align:center;width:60px">${item.quantity} ${item.unit||''}</td>
+          <td style="padding:7px 0;border-bottom:1px solid #EAEAE0">
+            <div style="font-size:13px;color:#333">${item.name}</div>
+            ${item.notes?`<div style="font-size:11px;color:#AAA;margin-top:1px">${item.notes}</div>`:''}
+          </td>
+          <td style="padding:7px 0;border-bottom:1px solid #EAEAE0;text-align:right;font-size:13px;color:#333;white-space:nowrap">$ ${lineTotal.toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+
+      // Category subtotal row
+      const subtotalRow = `<tr>
+        <td colspan="3" style="padding:8px 0 14px;text-align:right;font-size:11px;color:#888;letter-spacing:.04em;padding-right:8px">小計 Subtotal</td>
+        <td style="padding:8px 0 14px;text-align:right;font-size:13px;font-weight:600;color:#1A1A18;white-space:nowrap">$ ${t.toLocaleString()}</td>
+      </tr>`;
+
+      return headerRow + itemRows + subtotalRow;
     }),
-    `<tr>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC;font-size:13px;color:#555">0${cats.length+1}</td>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC;font-size:13px;color:#555;text-align:center">1</td>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC">
-        <div style="font-size:13px;color:#222;font-weight:500">管理費</div>
-        <div style="font-size:11px;color:#999;margin-top:2px">Management Fee (${project.management_fee_rate||7}%)</div>
+    // Management fee
+    `<tr style="border-top:1.5px solid #999">
+      <td style="padding:14px 0;font-size:13px;color:#555;width:50px">${String.fromCharCode(65+cats.length)}</td>
+      <td style="padding:14px 0;font-size:12px;color:#666;text-align:center;width:60px">1 式</td>
+      <td style="padding:14px 0">
+        <div style="font-size:13px;font-weight:700;color:#1A1A18">管理費</div>
+        <div style="font-size:11px;color:#999;margin-top:1px">Management Fee (${project.management_fee_rate||7}%)</div>
       </td>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC;text-align:right;font-size:13px;color:#222;font-weight:500;white-space:nowrap">$ ${mgmtFee.toLocaleString()}</td>
+      <td style="padding:14px 0;text-align:right;font-size:13px;font-weight:600;color:#1A1A18;white-space:nowrap">$ ${mgmtFee.toLocaleString()}</td>
     </tr>`,
     designFee>0 ? `<tr>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC;font-size:13px;color:#555">0${cats.length+2}</td>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC;font-size:13px;color:#555;text-align:center">1</td>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC">
-        <div style="font-size:13px;color:#222;font-weight:500">設計費</div>
-        <div style="font-size:11px;color:#999;margin-top:2px">Design Fee</div>
+      <td style="padding:14px 0;font-size:13px;color:#555">${String.fromCharCode(65+cats.length+1)}</td>
+      <td style="padding:14px 0;font-size:12px;color:#666;text-align:center">1 式</td>
+      <td style="padding:14px 0">
+        <div style="font-size:13px;font-weight:700;color:#1A1A18">設計費</div>
+        <div style="font-size:11px;color:#999;margin-top:1px">Design Fee</div>
       </td>
-      <td style="padding:14px 0;border-bottom:1px solid #CCC;text-align:right;font-size:13px;color:#222;font-weight:500;white-space:nowrap">$ ${designFee.toLocaleString()}</td>
+      <td style="padding:14px 0;text-align:right;font-size:13px;font-weight:600;color:#1A1A18;white-space:nowrap">$ ${designFee.toLocaleString()}</td>
     </tr>` : '',
   ].filter(Boolean).join('');
 
