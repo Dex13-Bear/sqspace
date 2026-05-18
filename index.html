@@ -8819,6 +8819,7 @@ function ProjectListPage({ user, onSelectProject }) {
   const [newClient, setNewClient] = useState('');
   const [newProjectType, setNewProjectType] = useState('preset'); // 'blank' | 'preset'
   const [selectedBlankCats, setSelectedBlankCats] = useState([]);
+  const [newAddress, setNewAddress] = useState('');
   const [allTemplateCats, setAllTemplateCats] = useState([]);
 
   useEffect(function() {
@@ -8869,7 +8870,7 @@ function ProjectListPage({ user, onSelectProject }) {
       (settingsData||[]).forEach(s => sObj[s.key] = s.value);
     } catch(e) { sObj = {}; }
     const { data, error } = await db.from('projects').insert({
-      name: newName, client_name: newClient,
+      name: newName, client_name: newClient, address: newAddress,
       notes: sObj['default_notes'] || '', created_by: user.username
     }).select().single();
     if (!data) { if(error) toast('建立失敗：' + error.message, 'error'); return; }
@@ -8903,7 +8904,7 @@ function ProjectListPage({ user, onSelectProject }) {
     }
 
     toast('專案已建立');
-    setShowNew(false); setNewName(''); setNewClient(''); setNewProjectType('preset'); setSelectedBlankCats([]);
+    setShowNew(false); setNewName(''); setNewClient(''); setNewAddress(''); setNewProjectType('preset'); setSelectedBlankCats([]);
     load();
   };
 
@@ -9287,62 +9288,8 @@ function ProjectListPage({ user, onSelectProject }) {
           <IMEInput className="form-input" value={newName} onChange={function(val){ setNewName(val); }} placeholder="例：台北信義區住宅案" /></div>
         <div className="form-group"><label className="form-label">客戶名稱</label>
           <IMEInput className="form-input" value={newClient} onChange={function(val){ setNewClient(val); }} /></div>
-        <div className="form-group">
-          <label className="form-label">專案類型</label>
-          <div style={{ display:'flex', gap:10, marginTop:4 }}>
-            <label style={{ flex:1, display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', border:'2px solid ' + (newProjectType==='preset'?'#2E4D5C':'#E0E0E0'), borderRadius:8, cursor:'pointer', background: newProjectType==='preset'?'#F0F4F8':'#fff' }}
-              onClick={() => setNewProjectType('preset')}>
-              <div style={{ marginTop:2 }}>
-                <div style={{ width:16, height:16, borderRadius:'50%', border:'2px solid #2E4D5C', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  {newProjectType==='preset' && <div style={{ width:8, height:8, borderRadius:'50%', background:'#2E4D5C' }} />}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontWeight:600, fontSize:13, color:'#2E4D5C' }}>預設專案</div>
-                <div style={{ fontSize:11, color:'#888', marginTop:2 }}>自動帶入常用大項和細項</div>
-              </div>
-            </label>
-            <label style={{ flex:1, display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', border:'2px solid ' + (newProjectType==='blank'?'#2E4D5C':'#E0E0E0'), borderRadius:8, cursor:'pointer', background: newProjectType==='blank'?'#F0F4F8':'#fff' }}
-              onClick={() => setNewProjectType('blank')}>
-              <div style={{ marginTop:2 }}>
-                <div style={{ width:16, height:16, borderRadius:'50%', border:'2px solid #888', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  {newProjectType==='blank' && <div style={{ width:8, height:8, borderRadius:'50%', background:'#2E4D5C' }} />}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontWeight:600, fontSize:13, color:'#555' }}>空白專案</div>
-                <div style={{ fontSize:11, color:'#888', marginTop:2 }}>勾選需要的工程大項</div>
-              </div>
-            </label>
-          </div>
-        </div>
-        {newProjectType === 'blank' && (
-          <div className="form-group">
-            <label className="form-label">選擇工程大項</label>
-            <div style={{ border:'1px solid #E0E0E0', borderRadius:8, maxHeight:220, overflowY:'auto' }}>
-              {allTemplateCats.length === 0 && (
-                <div style={{ padding:'16px', fontSize:12, color:'#AAA', textAlign:'center' }}>工程資料庫尚無大項</div>
-              )}
-              {allTemplateCats.map(function(cat) {
-                var checked = selectedBlankCats.indexOf(cat) >= 0;
-                return (
-                  <label key={cat} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', borderBottom:'1px solid #F0F0F0', cursor:'pointer', background: checked ? '#F0F4F8' : '#fff' }}
-                    onClick={function() {
-                      setSelectedBlankCats(function(prev) {
-                        return checked ? prev.filter(function(c) { return c !== cat; }) : prev.concat([cat]);
-                      });
-                    }}>
-                    <input type="checkbox" checked={checked} readOnly style={{ accentColor:'#2E4D5C', width:15, height:15 }} />
-                    <span style={{ fontSize:13, color:'#333' }}>{cat}</span>
-                  </label>
-                );
-              })}
-            </div>
-            {selectedBlankCats.length > 0 && (
-              <div style={{ fontSize:11, color:'#888', marginTop:4 }}>已選 {selectedBlankCats.length} 個大項（僅建立大項，不帶入細項）</div>
-            )}
-          </div>
-        )}
+        <div className="form-group"><label className="form-label">施工地址</label>
+          <IMEInput className="form-input" value={newAddress||''} onChange={function(val){ setNewAddress(val); }} placeholder="例：台北市內湖區陽光街321巷18號" /></div>
       </Modal>
     </div>
   );
