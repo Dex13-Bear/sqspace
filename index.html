@@ -8863,13 +8863,16 @@ function ProjectListPage({ user, onSelectProject }) {
 
   const createProject = async () => {
     if (!newName.trim()) return;
-    const { data: settingsData } = await db.from('settings').select('*');
-    const sObj = {}; (settingsData||[]).forEach(s => sObj[s.key] = s.value);
-    const { data } = await db.from('projects').insert({
+    let sObj = {};
+    try {
+      const { data: settingsData } = await db.from('settings').select('*');
+      (settingsData||[]).forEach(s => sObj[s.key] = s.value);
+    } catch(e) { sObj = {}; }
+    const { data, error } = await db.from('projects').insert({
       name: newName, client_name: newClient,
       notes: sObj['default_notes'] || '', created_by: user.username
     }).select().single();
-    if (!data) return;
+    if (!data) { if(error) toast('建立失敗：' + error.message, 'error'); return; }
 
     if (newProjectType === 'preset') {
       const workCatsRaw = sObj['default_work_cats'] || '前置、拆除、清潔工程\n水電、弱電工程\n冷氣工程\n木作工程\n油漆工程\n泥作工程\n清潔';
