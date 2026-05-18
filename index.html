@@ -318,6 +318,7 @@ window.addEventListener('load', function() {
 </script>
 <div id="root"></div><script type="text/babel" data-presets="react">
 
+
 // Global error display
 window.addEventListener('error', function(e) {
   document.getElementById('root').innerHTML =
@@ -5507,8 +5508,8 @@ function LightsQuotePage({ project, autoSyncMe, onAutoSyncDone }) {
 // ─────────────────────────────────────────
 // CABINET QUOTE PAGE（訂製櫃體估價）
 // ─────────────────────────────────────────
-</script>
-<script type="text/babel" data-presets="react">
+
+
 
 function CabinetQuotePage({ project, user, showCost, autoSyncMe, onAutoSyncDone }) {
   var CAT_NAME = '訂製櫃體工程';
@@ -12346,8 +12347,8 @@ function ProjectInfoTab({ project }) {
 
 
 
-</script>
-<script type="text/babel" data-presets="react">
+
+
 
 function FieldChangeTab({ project }) {
   const [records, setRecords] = useState([]);
@@ -17683,7 +17684,7 @@ function App() {
   const [projectTab, setProjectTab] = useState('summary');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sbConfigured, setSbConfigured] = useState(() =>
-    DEMO_MODE || !!(localStorage.getItem('sb_url') && localStorage.getItem('sb_key'))
+    DEMO_MODE || !!(DEFAULT_SB_URL && DEFAULT_SB_KEY) || !!(localStorage.getItem('sb_url') && localStorage.getItem('sb_key'))
   );
 
   // Auto-select content when focusing number inputs.
@@ -17886,6 +17887,7 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary><App /></ErrorBoundary>
 );
+
 
 </script>
 
