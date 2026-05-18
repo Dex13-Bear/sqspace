@@ -317,6 +317,7 @@ window.addEventListener('load', function() {
 });
 </script>
 <div id="root"></div><script type="text/babel" data-presets="react">
+
 // Global error display
 window.addEventListener('error', function(e) {
   document.getElementById('root').innerHTML =
@@ -5506,6 +5507,9 @@ function LightsQuotePage({ project, autoSyncMe, onAutoSyncDone }) {
 // ─────────────────────────────────────────
 // CABINET QUOTE PAGE（訂製櫃體估價）
 // ─────────────────────────────────────────
+</script>
+<script type="text/babel" data-presets="react">
+
 function CabinetQuotePage({ project, user, showCost, autoSyncMe, onAutoSyncDone }) {
   var CAT_NAME = '訂製櫃體工程';
   var FT = 30;
@@ -12342,6 +12346,9 @@ function ProjectInfoTab({ project }) {
 
 
 
+</script>
+<script type="text/babel" data-presets="react">
+
 function FieldChangeTab({ project }) {
   const [records, setRecords] = useState([]);
   const [cats, setCats] = useState([]);
@@ -17879,6 +17886,8 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary><App /></ErrorBoundary>
 );
+
 </script>
+
 </body>
 </html>
