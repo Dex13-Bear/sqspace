@@ -316,7 +316,8 @@ window.addEventListener('load', function() {
   }, 4000);
 });
 </script>
-<div id="root"></div><script type="text/babel" data-presets="react">
+<div id="root"></div><script type="text/babel" data-presets="react,env">
+
 
 
 // Global error display
@@ -1428,7 +1429,7 @@ function LoginLogo() {
   return (
     <>
       <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '0.15em' }}>無澀空間</div>
-      <div style={{ fontSize: 11, letterSpacing: '0.3em', color: '#999', marginTop: 4 }}>DAY BY DAY</div>
+      <div style={{ fontSize: 11, letterSpacing: '0.3em', color: '#999', marginTop: 4 }}>ARTRIUM</div>
     </>
   );
 }
@@ -8926,7 +8927,7 @@ function ProjectListPage({ user, onSelectProject }) {
     toast('複製中...');
     try {
       // Copy project
-      const { id: oldId, created_at, updated_at, ...projData } = proj;
+      const {  id: oldId, created_at, updated_at, } = proj; const projData = Object.assign({}, proj); ["id", "created_at", "updated_at"].forEach(k => delete projData[k]);
       const { data: newProj } = await db.from('projects').insert({ ...projData, name: newName, status: 'active', is_locked: false }).select().single();
       if (!newProj) throw new Error('建立專案失敗');
       // Copy work categories & items
@@ -8934,7 +8935,7 @@ function ProjectListPage({ user, onSelectProject }) {
       const { data: items } = await db.from('work_items').select('*').eq('project_id', oldId);
       if (cats && cats.length) {
         for (const cat of cats) {
-          const { id: oldCatId, project_id, ...catData } = cat;
+          const {  id: oldCatId, project_id, } = cat; const catData = Object.assign({}, cat); ["id", "project_id"].forEach(k => delete catData[k]);
           const { data: newCat } = await db.from('work_categories').insert({ ...catData, project_id: newProj.id }).select().single();
           if (newCat && items) {
             const catItems = items.filter(i => i.category_id === oldCatId);
@@ -8949,12 +8950,12 @@ function ProjectListPage({ user, onSelectProject }) {
       const { data: pItems } = await db.from('purchase_items').select('*').eq('project_id', oldId);
       if (pCats && pCats.length) {
         for (const pCat of pCats) {
-          const { id: oldPCatId, project_id, ...pCatData } = pCat;
+          const {  id: oldPCatId, project_id, } = pCat; const pCatData = Object.assign({}, pCat); ["id", "project_id"].forEach(k => delete pCatData[k]);
           const { data: newPCat } = await db.from('purchase_categories').insert({ ...pCatData, project_id: newProj.id }).select().single();
           if (newPCat && pItems) {
             const pCatItems = pItems.filter(i => i.category_id === oldPCatId);
             if (pCatItems.length) {
-              await db.from('purchase_items').insert(pCatItems.map(({ id, project_id, category_id, ...d }) => ({ ...d, project_id: newProj.id, category_id: newPCat.id })));
+              await db.from('purchase_items').insert(pCatItems.map(({ id, project_id, category_id, ...d2 }) => ({ ...d2, project_id: newProj.id, category_id: newPCat.id })));
             }
           }
         }
@@ -12530,7 +12531,7 @@ function SiteLogTab({ project }) {
   useEffect(() => { load(); }, [load]);
 
   const addLog = async () => {
-    const { addToField, fieldAmount, fieldSign, ...logData } = form;
+    const {  addToField, fieldAmount, fieldSign, } = form; const logData = Object.assign({}, form); ["addToField", "fieldAmount", "fieldSign"].forEach(k => delete logData[k]);
     await db.from('site_logs').insert({ ...logData, project_id: project.id });
     const msgs = ['已新增日誌'];
     if (addToField && fieldAmount) {
@@ -17350,7 +17351,7 @@ function MobileSiteLogPage({ user }) {
 
   const addLog = async () => {
     if (!selProj) return toast('請先選擇專案', 'error');
-    const { addToTodo, addToChange, changeCategory, changeSign, changeAmount, ...logData } = form;
+    const {  addToTodo, addToChange, changeCategory, changeSign, changeAmount, } = form; const logData = Object.assign({}, form); ["addToTodo", "addToChange", "changeCategory", "changeSign", "changeAmount"].forEach(k => delete logData[k]);
     const imageUrl = newImgs.length ? JSON.stringify(newImgs) : null;
     await db.from('site_logs').insert({ ...logData, project_id: selProj, ...(imageUrl ? { image_url: imageUrl } : {}) });
     const msgs = ['已新增日誌'];
@@ -17607,7 +17608,7 @@ function SidebarLogo() {
   return (
     <>
       <div className="sidebar-logo-text">無澀空間</div>
-      <div style={{ fontSize: 9, color: '#555', letterSpacing: '0.2em', marginTop: 1 }}>DAY BY DAY</div>
+      <div style={{ fontSize: 9, color: '#555', letterSpacing: '0.2em', marginTop: 1 }}>ARTRIUM</div>
     </>
   );
 }
@@ -17887,6 +17888,7 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary><App /></ErrorBoundary>
 );
+
 
 
 </script>
