@@ -960,14 +960,10 @@ function Modal({ open, title, onClose, children, footer, size = 'md' }) {
 // ─────────────────────────────────────────
 // PRINT SYSTEM — opens a clean new window
 // ─────────────────────────────────────────
-function openPrintWindow(project, data, sections) {
+function openPrintWindow(project, data, sections, paymentMode) {
   const { cats, items, pCats, pItems, gallery, banks, settings } = data;
-  const bank = banks.find(b=>b.id===project.bank_account_id) || banks.find(b=>b.is_default) || banks[0] || null;
-  const largeLogo = settings['large_logo_url'] || '';
-  const smallLogo = settings['small_logo_url'] || '';
-
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const fmtN = n => '$' + Math.round(n||0).toLocaleString();
+  const fmtN = n => '$ ' + Math.round(n||0).toLocaleString();
   const catTotal = catId => items.filter(i=>i.category_id===catId).reduce((s,i)=>s+i.unit_price*i.quantity,0);
   const workTotal = cats.reduce((s,c)=>s+catTotal(c.id),0);
   const designFee = (project.area_sqm||0)*(project.design_fee_per_sqm||0);
@@ -975,26 +971,285 @@ function openPrintWindow(project, data, sections) {
   const subtotal = workTotal+designFee+mgmtFee;
   const tax = project.tax_enabled ? subtotal*((project.tax_rate||5)/100) : 0;
   const purchaseTotal = pItems.reduce((s,i)=>s+i.unit_price*i.quantity,0);
-  const grandTotal = subtotal+tax+purchaseTotal;
+  const grandTotal = subtotal+tax;
 
-  const logoBlock = largeLogo
-    ? `<img src="${esc(largeLogo)}" style="max-height:55px;max-width:200px;object-fit:contain">`
-    : `<div style="font-size:26px;font-weight:700;letter-spacing:0.2em">無澀空間</div>`;
-  const footerContent = smallLogo
-    ? `<img src="${esc(smallLogo)}" style="height:22px;object-fit:contain;vertical-align:middle;margin-right:8px">`
-    : '';
+  // Payment info based on selected mode
+  const isCompany = paymentMode === 'company';
+  const payeeName = isCompany ? '無澀空間室內裝修股份有限公司' : '鄭凱群';
+  const paymentHTML = `
+    <div style="margin-top:40px;border-top:1px solid #CCC;padding-top:20px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:8px;letter-spacing:.06em">PAYMENT ITEMS</div>
+      <div style="font-size:12px;color:#555;line-height:2.2">
+        付款方式：匯款 或 開立支票（抬頭：${payeeName}）<br>
+        ${isCompany
+          ? `公司：無澀空間室內裝修股份有限公司　統一編號：90535151<br>銀行帳號：（請填入公司帳號）`
+          : `銀行：台北富邦 營業部（012）　帳號：81680008713711`
+        }
+      </div>
+    </div>
+    <div style="margin-top:20px;border-top:1px solid #E0E0E0;padding-top:16px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px;letter-spacing:.06em">THANKS FOR CHOOSING 無澀空間 ARTRIUM</div>
+      <div style="font-size:11px;color:#888;line-height:1.9">
+        如有任何問題，請聯絡 Dexigner13@gmail.com 或 0910119114。<br>
+        本報價單有效期限為開立日起 30 天。＊未列項目及尺寸增加均列為追加項目
+      </div>
+    </div>`;
 
+  // Logo block
+  const logoSrc = settings['large_logo_url'] || '';
+  const logoBlock = logoSrc
+    ? `<img src="${esc(logoSrc)}" style="height:72px;object-fit:contain">`
+    : `<div style="font-size:11px;font-weight:700;letter-spacing:.15em;color:#888">ARTRIUM</div>
+       <div style="font-size:22px;font-weight:700;margin-top:2px;letter-spacing:.05em">無澀空間</div>`;
+
+  // FROM / BILLED TO header
+  const headerBlock = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;margin-bottom:8px">FROM</div>
+        <div style="font-size:13px;line-height:2;color:#222">
+          <div style="font-weight:700">無澀空間 ARTRIUM</div>
+          <div>台北市內湖區陽光街321巷18號4樓</div>
+          <div>M / 0910119114</div>
+          <div>E / Dexigner13@gmail.com</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;margin-bottom:8px">BILLED TO</div>
+        <div style="font-size:13px;line-height:2;color:#222">
+          <div style="font-weight:700">${esc(project.client_name||'—')}</div>
+          ${project.contact_person ? `<div>${esc(project.contact_person)}</div>` : ''}
+          ${project.address ? `<div>${esc(project.address)}</div>` : ''}
+          ${project.contact_phone ? `<div>${esc(project.contact_phone)}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+
+  // Invoice meta
+  const _now = new Date();
+  const dateStr = _now.getFullYear() + '/' + String(_now.getMonth()+1).padStart(2,'0') + '/' + String(_now.getDate()).padStart(2,'0');
+  const invoiceNo = String(_now.getFullYear()).slice(2) + String(_now.getMonth()+1).padStart(2,'0') + String(_now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*900)+100);
+  const metaBlock = `
+    <div style="margin-bottom:28px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:3px">Invoice</div>
+      <div style="font-size:12px;color:#555"># ${invoiceNo}</div>
+      <div style="font-size:11px;font-weight:700;color:#555;margin-top:10px;margin-bottom:3px">Date</div>
+      <div style="font-size:12px;color:#555">${dateStr}</div>
+    </div>`;
+
+  // Table header
+  const tableHeader = `
+    <div style="border-top:1.5px solid #333;margin-bottom:0"></div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1px solid #999">
+          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:50px">S.No</th>
+          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:60px">Qty</th>
+          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em">Description</th>
+          <th style="padding:10px 0;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em">Price</th>
+        </tr>
+      </thead>`;
+
+  const dateP = _now.getFullYear() + String(_now.getMonth()+1).padStart(2,'0') + String(_now.getDate()).padStart(2,'0');
   let body = '';
 
-  // bankHTML defined at top level so all sections can use it
-  const bankHTML = bank ? `
-    <div class="section-title">匯款資訊</div>
-    <div style="font-size:11px;line-height:2.2">
-      匯款銀行：${esc(bank.bank_name)}<br>
-      帳號：${esc(bank.account_number)}<br>
-      戶名：${esc(bank.account_holder)}<br>
-      <span style="color:#666">※ 請於收到請款單後三日內完成匯款，感謝您的配合！</span>
-    </div>` : '';
+  // ── Summary Page ──
+  if (sections.summary) {
+    let rowNum = 1;
+    const catRows = cats.map(c => {
+      const t = catTotal(c.id);
+      return `<tr>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#666;text-align:center">1</td>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:500;color:#222">${esc(c.name)}</td>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${t?fmtN(t):'—'}</td>
+      </tr>`;
+    }).join('');
+
+    // Management fee row
+    const mgmtRow = `<tr>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:13px;color:#666">1</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA">
+        <div style="font-size:13px;font-weight:500;color:#222">管理費</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">Management Fee (${project.management_fee_rate||7}%)</div>
+      </td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${fmtN(mgmtFee)}</td>
+    </tr>`;
+
+    const designRow = designFee > 0 ? `<tr>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:13px;color:#666">1</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA">
+        <div style="font-size:13px;font-weight:500;color:#222">設計費</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">Design Fee</div>
+      </td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${fmtN(designFee)}</td>
+    </tr>` : '';
+
+    const summaryBlock = `
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <table style="width:200px;border-collapse:collapse">
+          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Sub Total</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(subtotal)}</td></tr>
+          ${project.tax_enabled ? `<tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Tax (${project.tax_rate||5}%)</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(tax)}</td></tr>` : ''}
+          <tr style="border-top:1.5px solid #333">
+            <td style="padding:10px 0;font-size:13px;font-weight:700;text-align:right;padding-right:16px">Total</td>
+            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">${fmtN(grandTotal)}</td>
+          </tr>
+        </table>
+      </div>`;
+
+    body += `<div class="page">
+      <div style="margin-bottom:36px">${logoBlock}</div>
+      ${headerBlock}
+      ${metaBlock}
+      ${tableHeader}
+        <tbody>${catRows}${mgmtRow}${designRow}</tbody>
+      </table>
+      ${summaryBlock}
+      ${paymentHTML}
+    </div>`;
+  }
+
+  // ── Detail Pages ──
+  if (sections.detail) {
+    cats.forEach((cat, ci) => {
+      const catItems = items.filter(i => i.category_id === cat.id);
+      if (!catItems.length) return;
+      const itemRows = catItems.map((it, ii) => {
+        const total = it.unit_price * it.quantity;
+        return `<tr>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0">
+            <div style="font-size:12px;color:#333">${esc(it.name)}</div>
+            ${it.notes ? `<div style="font-size:10px;color:#AAA;margin-top:1px">${esc(it.notes)}</div>` : ''}
+          </td>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
+        </tr>`;
+      }).join('');
+      const t = catTotal(cat.id);
+      body += `<div class="page">
+        <div style="margin-bottom:24px">${logoBlock}</div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:.02em;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">${String.fromCharCode(65+ci)}. ${esc(cat.name)}</div>
+        ${tableHeader}
+          <tbody>${itemRows}</tbody>
+          <tfoot>
+            <tr style="border-top:1px solid #999">
+              <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">Subtotal</td>
+              <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(t)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+    });
+  }
+
+  // ── Purchase Page ──
+  if (sections.purchase && pItems.length > 0) {
+    const pRows = pItems.map((it, ii) => {
+      const total = it.unit_price * it.quantity;
+      const pCat = pCats.find(c => c.id === it.category_id);
+      return `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0">
+          <div style="font-size:12px;color:#333">${esc(it.name)}</div>
+          ${pCat ? `<div style="font-size:10px;color:#AAA;margin-top:1px">${esc(pCat.name)}</div>` : ''}
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
+      </tr>`;
+    }).join('');
+    body += `<div class="page">
+      <div style="margin-bottom:24px">${logoBlock}</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">採購明細</div>
+      ${tableHeader}
+        <tbody>${pRows}</tbody>
+        <tfoot>
+          <tr style="border-top:1px solid #999">
+            <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">採購合計</td>
+            <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(purchaseTotal)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      ${paymentHTML}
+    </div>`;
+  }
+
+  // ── Change Records ──
+  if (sections.change && data.changeRecords && data.changeRecords.length > 0) {
+    const changes = data.changeRecords;
+    const changeRows = changes.map((c, i) => {
+      const isAdd = (c.change_sign||'add') === 'add';
+      return `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${i+1}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:12px">${esc(c.description||c.name||'')}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;text-align:center">${esc(c.unit||'式')}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:${isAdd?'#2E4D5C':'#8B2E2E'};white-space:nowrap">${isAdd?'+':'-'}${fmtN(c.amount||0)}</td>
+      </tr>`;
+    }).join('');
+    const changeTotal = changes.reduce((s,c) => s + ((c.change_sign||'add')==='add' ? (c.amount||0) : -(c.amount||0)), 0);
+    body += `<div class="page">
+      <div style="margin-bottom:24px">${logoBlock}</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">追加追減明細</div>
+      ${tableHeader.replace('S.No','#').replace('Description','項目說明').replace('Price','金額')}
+        <tbody>${changeRows}</tbody>
+        <tfoot>
+          <tr style="border-top:1px solid #999">
+            <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">追加追減合計</td>
+            <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;color:${changeTotal>=0?'#2E4D5C':'#8B2E2E'};white-space:nowrap">${changeTotal>=0?'+':''}${fmtN(Math.abs(changeTotal))}</td>
+          </tr>
+        </tfoot>
+      </table>
+      ${paymentHTML}
+    </div>`;
+  }
+
+  // ── Payment Page ──
+  if (sections.payment && data.paymentStages && data.paymentStages.length > 0) {
+    const ps = data.paymentStages;
+    const totalAmount = ps.reduce((s,st)=>s+(st.amount||0),0);
+    const currentStages = ps.filter(s=>s.is_current);
+    const currentTotal = currentStages.reduce((s,st)=>s+(st.amount||0),0);
+    const stageRows = ps.map((s,i) => {
+      const tag = s.is_current ? '本期請領' : ((s.paid_amount||0)>0?'已請領':'待請領');
+      const isCur = s.is_current;
+      return `<tr>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;font-size:11px;color:#AAA;width:40px;padding-left:10px">${String(i+1).padStart(2,'0')}</td>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:12px;color:#666;width:60px">1</td>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA">
+          <div style="font-size:13px;font-weight:${isCur?700:400};color:${isCur?'#222':'#888'}">${esc(s.name)}</div>
+          <div style="font-size:11px;color:${isCur?'#555':'#AAA'};margin-top:2px">${tag}</div>
+        </td>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;text-align:right;font-size:13px;font-weight:${isCur?700:400};color:${isCur?'#222':'#AAA'};white-space:nowrap">${isCur?fmtN(s.amount||0):'—'}</td>
+      </tr>`;
+    }).join('');
+    body += `<div class="page">
+      <div style="margin-bottom:36px">${logoBlock}</div>
+      ${headerBlock}
+      <div style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:3px">Invoice</div>
+        <div style="font-size:12px;color:#555"># ${invoiceNo}</div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:10px;margin-bottom:3px">Date</div>
+        <div style="font-size:12px;color:#555">${dateStr}</div>
+        <div style="font-size:12px;color:#888;margin-top:8px">合約總金額：<strong style="color:#222;font-size:14px">${fmtN(totalAmount)}</strong></div>
+      </div>
+      ${tableHeader}
+        <tbody>${stageRows}</tbody>
+      </table>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <table style="width:200px;border-collapse:collapse">
+          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Total Amount</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(currentTotal)}</td></tr>
+          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Tax (0%)</td><td style="padding:6px 0;font-size:12px;text-align:right">$ 0</td></tr>
+          <tr style="border-top:1.5px solid #333">
+            <td style="padding:10px 0;font-size:13px;font-weight:700;text-align:right;padding-right:16px">Amount Due</td>
+            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">${fmtN(currentTotal)}</td>
+          </tr>
+        </table>
+      </div>
+      ${paymentHTML}
+    </div>`;
+  }
 
   // ── Summary Page ──
   if (sections.summary) {
@@ -1282,52 +1537,37 @@ function openPrintWindow(project, data, sections) {
     '</div>';
   }
 
-  const _now = new Date();
-  const dateP = _now.getFullYear() + String(_now.getMonth()+1).padStart(2,'0') + String(_now.getDate()).padStart(2,'0');
-
   const html = `<!DOCTYPE html><html lang="zh-TW"><head>
     <meta charset="UTF-8">
-    <title>${dateP} ${esc(project.name)} — 工程估價單</title>
+    <title>${dateP} ${esc(project.name)} — 無澀空間 ARTRIUM</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:'Noto Sans TC',sans-serif;font-size:11.5px;color:#111;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      .page{padding:12mm 14mm 5mm;page-break-after:always;min-height:270mm;display:flex;flex-direction:column}
+      body{font-family:'Noto Sans TC','Helvetica Neue',sans-serif;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{padding:14mm 16mm 10mm;page-break-after:always;min-height:270mm}
       .page:last-child{page-break-after:auto}
-      .logo-block{text-align:center;padding-bottom:18px;margin-bottom:0}
-      .info-table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px}
-      .info-table .lbl{color:#666;width:52px;padding:3px 4px 3px 0;white-space:nowrap;vertical-align:top}
-      .info-table .val{border-bottom:1px solid #DDD;padding:3px 0 2px 4px;vertical-align:top}
-      .project-name{font-size:15px;font-weight:700}
-      .section-title{font-size:12px;font-weight:700;border-left:3px solid #111;padding-left:6px;margin:8px 0 4px}
-      .main-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px}
-      .main-table thead tr{background:#F2F2F0;border-bottom:1.5px solid #666}
-      .main-table th{padding:5px 7px;font-weight:600;color:#444;text-align:left}
-      .main-table td{padding:4px 7px;border-bottom:1px solid #EBEBEA;vertical-align:top}
-      .main-table .num{text-align:right}
-      .main-table .idx{color:#888;text-align:center}
-      .main-table .empty{text-align:center;color:#CCC;padding:8px}
-      .totals{border-top:2px solid #111;font-size:11px}
-      .total-row{display:flex;justify-content:space-between;padding:3px 7px}
-      .total-row.red{color:#B00}
-      .total-row.grand{font-weight:700;font-size:13px;background:#F2F2F0;padding:5px 7px;margin-top:2px}
-      .cat-block{margin-bottom:8px;page-break-inside:avoid}
-      .cat-header{background:#EBEBEA;padding:5px 8px;font-weight:700;font-size:11.5px;display:flex;justify-content:space-between;border-bottom:1px solid #CCC}
-      .group-row td{background:#F7F7F5;font-size:10px;color:#555;font-weight:600;padding:3px 7px!important}
-      .gallery-card{border:1px solid #DDD;border-radius:3px;overflow:hidden;page-break-inside:avoid}
-      .footer{margin-top:auto;padding-top:40px;border-top:1px solid #DDD;font-size:9px;color:#999;letter-spacing:0.1em;display:flex;align-items:center;justify-content:center}
-      @media print{@page{size:A4 portrait;margin:14mm 14mm 10mm}.page{padding:0;min-height:auto}}
+      table{width:100%;border-collapse:collapse}
+      .np{padding:10px 20px;background:#f0f0ec;display:flex;gap:8px;align-items:center}
+      .np button{padding:6px 16px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
+      @media print{.np{display:none!important} @page{size:A4;margin:0} .page{padding:14mm 16mm 10mm;min-height:auto}}
     </style>
-  </head><body>${body}<script>window.onload=function(){setTimeout(function(){window.print()},600)}<\/script></body></html>`;
+  </head><body>
+  <div class="np">
+    <button onclick="window.print()" style="background:#1A1A18;color:#fff">🖨 列印 / 存成 PDF</button>
+    <button onclick="window.close()" style="background:#fff;border:1px solid #ccc">關閉</button>
+    <span style="font-size:11px;color:#888;margin-left:8px">${esc(project.name)} — 無澀空間 ARTRIUM</span>
+  </div>
+  ${body}</body></html>`;
 
-  const win = window.open('', '_blank', 'width=900,height=700');
-  if (!win) { alert('請允許彈出視窗以使用列印功能'); return; }
-  win.document.write(html);
-  win.document.close();
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(()=>URL.revokeObjectURL(url), 30000);
 }
 
 function PrintModal({ open, onClose, project }) {
-  const [sections, setSections] = useState({ summary: true, work: true, purchase: true, schedule: false, gallery: true, payment: false });
+  const [sections, setSections] = useState({ summary: true, work: true, purchase: false, schedule: false, gallery: false, payment: false, change: false });
+  const [paymentMode, setPaymentMode] = useState('personal');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -1340,31 +1580,30 @@ function PrintModal({ open, onClose, project }) {
       db.from('work_items').select('*').eq('project_id', project.id).order('sort_order'),
       db.from('purchase_categories').select('*').eq('project_id', project.id).order('sort_order'),
       db.from('purchase_items').select('*').eq('project_id', project.id).order('sort_order'),
-      db.from('gallery').select('*').eq('project_id', project.id).eq('is_selected', true),
-      db.from('bank_accounts').select('*').order('sort_order'),
-      db.from('settings').select('*'),
-      db.from('schedule_items').select('*').eq('project_id', project.id).order('sort_order'),
-      db.from('schedule_events').select('*').eq('project_id', project.id).order('start_date'),
-      db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order'),
+      Promise.resolve({ data: [] }),
+      Promise.resolve({ data: [] }),
+      Promise.resolve({ data: [] }),
+      db.from('schedules').select('*').eq('project_id', project.id).order('sort_order').catch(()=>({data:[]})),
+      Promise.resolve({ data: [] }),
+      db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order').catch(()=>({data:[]})),
     ]).then(([c,i,pc,pi,g,b,s,sched,sevents,pay]) => {
-      const sObj = {}; (s.data||[]).forEach(x => sObj[x.key]=x.value);
-      setData({ cats:c.data||[], items:i.data||[], pCats:pc.data||[], pItems:pi.data||[], gallery:g.data||[], banks:b.data||[], settings:sObj, scheduleItems:sched.data||[], scheduleEvents:sevents.data||[], paymentStages:pay.data||[] });
+      setData({ cats:c.data||[], items:i.data||[], pCats:pc.data||[], pItems:pi.data||[], gallery:[], banks:[], settings:{}, scheduleItems:sched.data||[], scheduleEvents:[], paymentStages:pay.data||[], changeRecords:[] });
       setLoading(false);
-    });
+    }).catch(()=>setLoading(false));
   }, [open, project.id]);
 
   const toggle = k => setSections(p => ({ ...p, [k]: !p[k] }));
 
   const doPrint = () => {
     if (!data) return;
-    openPrintWindow(project, data, sections);
+    openPrintWindow(project, data, sections, paymentMode);
     onClose();
   };
 
   if (!open) return null;
   return (
     <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth:420 }}>
+      <div className="modal" style={{ maxWidth:440 }}>
         <div className="modal-header">
           <div className="modal-title">列印選項</div>
           <button className="btn-icon" onClick={onClose}>✕</button>
@@ -1373,42 +1612,55 @@ function PrintModal({ open, onClose, project }) {
           {loading
             ? <div className="loading-center"><div className="spinner"/><div>載入資料中...</div></div>
             : <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <div style={{
-                  background:'#FFF8E1', border:'1px solid #F0DCA0', borderRadius:8,
-                  padding:'10px 12px', fontSize:12, color:'#8B6500',
-                  display:'flex', gap:8, alignItems:'flex-start'
-                }}>
-                  <span style={{ fontSize:16, lineHeight:1 }}>⚠️</span>
-                  <div>
-                    <div style={{ fontWeight:600, marginBottom:2 }}>列印前請先確認同步狀態</div>
-                    <div style={{ color:'#A88748', lineHeight:1.5 }}>
-                      燈具開關迴路、訂製櫃體、玻璃、電氣、空調、木作 等估價頁如有改動，請先回到該頁按「同步到工程明細」，否則列印的內容可能不是最新的
-                    </div>
+                {/* Payment mode selector */}
+                <div className="form-group" style={{marginBottom:4}}>
+                  <label className="form-label">付款方式（顯示於文件底部）</label>
+                  <div style={{display:'flex',gap:8,marginTop:6}}>
+                    {[
+                      {val:'personal', label:'個人', sub:'鄭凱群　台北富邦 81680008713711'},
+                      {val:'company',  label:'公司', sub:'無澀空間室內裝修　統編 90535151'},
+                    ].map(opt=>(
+                      <label key={opt.val} onClick={()=>setPaymentMode(opt.val)}
+                        style={{flex:1,display:'flex',alignItems:'flex-start',gap:8,padding:'10px 12px',
+                          border:'2px solid '+(paymentMode===opt.val?'#2E4D5C':'#E0E0E0'),
+                          borderRadius:8,cursor:'pointer',background:paymentMode===opt.val?'#EDF0EC':'#fff'}}>
+                        <div style={{width:16,height:16,borderRadius:'50%',border:'2px solid '+(paymentMode===opt.val?'#2E4D5C':'#CCC'),
+                          display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>
+                          {paymentMode===opt.val&&<div style={{width:8,height:8,borderRadius:'50%',background:'#2E4D5C'}}/>}
+                        </div>
+                        <div>
+                          <div style={{fontWeight:600,fontSize:13,color:'#222'}}>{opt.label}</div>
+                          <div style={{fontSize:10,color:'#888',marginTop:2}}>{opt.sub}</div>
+                        </div>
+                      </label>
+                    ))}
                   </div>
                 </div>
-                {[
-                  { key:'summary', label:' 專案總表', desc:'費用總表、注意事項、匯款資訊、業主簽名欄' },
-                  { key:'work', label:' 工程明細', desc:'各大項工程細項清單' },
-                  { key:'purchase', label:' 採購明細', desc:'採購品項清單' },
-                  { key:'schedule', label:' 進度排程', desc:'甘特圖與工種退場進場排程' },
-                  { key:'gallery', label:' 附件（已勾選圖庫）', desc:'圖庫中已勾「本案選用」的圖片' },
-                  { key:'payment', label:' 請款單', desc:'各期付款明細、本期應收、匯款資訊' },
-                ].map(s => (
-                  <label key={s.key} style={{ display:'flex', gap:12, cursor:'pointer', padding:'12px 14px', background:sections[s.key]?'#EDF0EC':'#F8F8F6', borderRadius:8, border:(sections[s.key]?'1px solid #C8D0C0':'1px solid #E8E8E6'), alignItems:'center' }}>
-                    <input type="checkbox" checked={sections[s.key]} onChange={()=>toggle(s.key)} style={{ width:16, height:16, accentColor:'#2E4D5C', flexShrink:0 }} />
-                    <div>
-                      <div style={{ fontWeight:600, fontSize:13 }}>{s.label}</div>
-                      <div style={{ fontSize:11, color:'#888', marginTop:2 }}>{s.desc}</div>
-                    </div>
-                  </label>
-                ))}
+                <div style={{borderTop:'1px solid #F0F0F0',paddingTop:10}}>
+                  <div style={{fontSize:11,fontWeight:600,color:'#555',marginBottom:8}}>選擇列印內容</div>
+                  {[
+                    { key:'summary',  label:'工程報價總表', desc:'各大項費用彙整、管理費、總計' },
+                    { key:'work',     label:'工程明細', desc:'各大項所有細項展開清單' },
+                    { key:'purchase', label:'採購明細', desc:'採購品項清單' },
+                    { key:'change',   label:'追加追減明細', desc:'追加追減項目清單' },
+                    { key:'payment',  label:'請款單', desc:'各期付款明細、本期應收' },
+                  ].map(s => (
+                    <label key={s.key} style={{ display:'flex', gap:12, cursor:'pointer', padding:'10px 14px', background:sections[s.key]?'#EDF0EC':'#F8F8F6', borderRadius:8, border:(sections[s.key]?'1px solid #C8D0C0':'1px solid #E8E8E6'), alignItems:'center', marginBottom:6 }}>
+                      <input type="checkbox" checked={sections[s.key]} onChange={()=>toggle(s.key)} style={{ width:16, height:16, accentColor:'#2E4D5C', flexShrink:0 }} />
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:13 }}>{s.label}</div>
+                        <div style={{ fontSize:11, color:'#888', marginTop:2 }}>{s.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
           }
         </div>
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
           <button className="btn btn-primary" onClick={doPrint} disabled={loading || !Object.values(sections).some(Boolean)}>
-            列印 / 存 PDF
+            🖨 列印 / 存 PDF
           </button>
         </div>
       </div>
