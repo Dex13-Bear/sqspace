@@ -8871,7 +8871,7 @@ function ProjectListPage({ user, onSelectProject }) {
     } catch(e) { sObj = {}; }
     const { data, error } = await db.from('projects').insert({
       name: newName, client_name: newClient, address: newAddress,
-      notes: sObj['default_notes'] || '', created_by: user.username
+      notes: sObj['default_notes'] || '', created_by: user.id || null
     }).select().single();
     if (!data) { if(error) toast('建立失敗：' + error.message, 'error'); return; }
 
