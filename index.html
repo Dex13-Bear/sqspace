@@ -1580,13 +1580,9 @@ function PrintModal({ open, onClose, project }) {
       db.from('work_items').select('*').eq('project_id', project.id).order('sort_order'),
       db.from('purchase_categories').select('*').eq('project_id', project.id).order('sort_order'),
       db.from('purchase_items').select('*').eq('project_id', project.id).order('sort_order'),
-      Promise.resolve({ data: [] }),
-      Promise.resolve({ data: [] }),
-      Promise.resolve({ data: [] }),
-      db.from('schedules').select('*').eq('project_id', project.id).order('sort_order').catch(()=>({data:[]})),
-      Promise.resolve({ data: [] }),
-      db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order').catch(()=>({data:[]})),
-    ]).then(([c,i,pc,pi,g,b,s,sched,sevents,pay]) => {
+      db.from('schedules').select('*').eq('project_id', project.id).order('sort_order'),
+      db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order'),
+    ]).then(([c,i,pc,pi,sched,pay]) => {
       setData({ cats:c.data||[], items:i.data||[], pCats:pc.data||[], pItems:pi.data||[], gallery:[], banks:[], settings:{}, scheduleItems:sched.data||[], scheduleEvents:[], paymentStages:pay.data||[], changeRecords:[] });
       setLoading(false);
     }).catch(()=>setLoading(false));
