@@ -8,12 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
 
-<script>
-// Register Babel plugins for iOS Safari compatibility
-Babel.registerPlugin('transform-optional-chaining', Babel.availablePlugins['transform-optional-chaining'] || function(){return {visitor:{}};});
-Babel.registerPlugin('transform-nullish-coalescing-operator', Babel.availablePlugins['transform-nullish-coalescing-operator'] || function(){return {visitor:{}};});
 
-</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -294,24 +289,7 @@ window.addEventListener('load', function() {
     var root = document.getElementById('root');
     if (!root || root.children.length === 0) {
       var d = document.getElementById('error-display');
-      if (window.Babel) {
-        var scripts = document.querySelectorAll('script[type="text/babel"]');
-        scripts.forEach(function(s) {
-          try {
-            Babel.transform(s.textContent, { presets: ['react'] });
-          } catch(e) {
-            d.style.display = 'block';
-            d.textContent = 'Babel 編譯錯誤:\n' + e.message;
-          }
-        });
-        if (d.style.display === 'none') {
-          d.style.display = 'block';
-          d.textContent = 'React 未能渲染，但 Babel 無錯誤。可能是執行期錯誤。';
-        }
-      } else {
-        d.style.display = 'block';
-        d.textContent = 'Babel 未載入（可能是網路問題）';
-      }
+      if (d) { d.style.display='block'; d.textContent='React 未能渲染，請重新整理頁面。'; }
     }
   }, 4000);
 });
@@ -321,6 +299,7 @@ window.addEventListener('load', function() {
 
 function openPrintWindow(project, data, sections, paymentMode) {
   const { cats, items, pCats, pItems, gallery, banks, settings } = data;
+  try {
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fmtN = n => '$ ' + Math.round(n||0).toLocaleString();
   const catTotal = catId => items.filter(i=>i.category_id===catId).reduce((s,i)=>s+i.unit_price*i.quantity,0);
@@ -471,34 +450,58 @@ function openPrintWindow(project, data, sections, paymentMode) {
   }
 
   // ── Detail Pages ──
-  if (sections.detail) {
+  if (sections.work) {
     cats.forEach((cat, ci) => {
       const catItems = items.filter(i => i.category_id === cat.id);
       if (!catItems.length) return;
+      const t = catItems.reduce((s, it) => s + it.unit_price * it.quantity, 0);
+      const letter = String.fromCharCode(65 + ci);
+
       const itemRows = catItems.map((it, ii) => {
         const total = it.unit_price * it.quantity;
-        return `<tr>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0">
+        return `<tr style="page-break-inside:avoid">
+          <td style="padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
+          <td style="padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
+          <td style="padding:6px 0;border-bottom:1px solid #F0F0F0">
             <div style="font-size:12px;color:#333">${esc(it.name)}</div>
             ${it.notes ? `<div style="font-size:10px;color:#AAA;margin-top:1px">${esc(it.notes)}</div>` : ''}
           </td>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
+          <td style="padding:6px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
         </tr>`;
-      }).join('');
-      const t = catTotal(cat.id);
-      body += `<div class="page">
-        <div style="margin-bottom:24px">${logoBlock}</div>
-        <div style="font-size:13px;font-weight:700;letter-spacing:.02em;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">${String.fromCharCode(65+ci)}. ${esc(cat.name)}</div>
-        ${tableHeader}
-          <tbody>${itemRows}</tbody>
-          <tfoot>
-            <tr style="border-top:1px solid #999">
-              <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">Subtotal</td>
-              <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(t)}</td>
+      });
+
+      // Last item + subtotal must stay together
+      const lastItemRow = itemRows.pop() || '';
+      const subtotalRow = `<tr>
+        <td colspan="3" style="padding:8px 0;text-align:right;font-size:11px;color:#888;padding-right:8px">Subtotal</td>
+        <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(t)}</td>
+      </tr>`;
+
+      body += `<div class="page" style="padding:14mm 16mm 10mm">
+        <div style="margin-bottom:16px">${logoBlock}</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;padding-bottom:8px;border-bottom:1.5px solid #333">${letter}. ${esc(cat.name)}</div>
+        <table style="border-collapse:collapse;width:100%">
+          <thead>
+            <tr style="border-bottom:1px solid #999">
+              <th style="padding:8px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:40px">#</th>
+              <th style="padding:8px 0;text-align:center;font-size:11px;font-weight:700;letter-spacing:.06em;width:70px">QTY</th>
+              <th style="padding:8px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em">DESCRIPTION</th>
+              <th style="padding:8px 0;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em">PRICE</th>
             </tr>
-          </tfoot>
+          </thead>
+          <tbody>
+            ${itemRows.join('')}
+            <tr style="page-break-inside:avoid">
+              <td colspan="4" style="padding:0">
+                <table style="width:100%;border-collapse:collapse">
+                  <tbody>
+                    ${lastItemRow.replace(/<tr[^>]*>/,'<tr>').replace(/<\/tr>/,'</tr>')}
+                    ${subtotalRow}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
         </table>
       </div>`;
     });
@@ -610,7 +613,35 @@ function openPrintWindow(project, data, sections, paymentMode) {
     </div>`;
   }
 
+  const html = `<!DOCTYPE html><html lang="zh-TW"><head>
+    <meta charset="UTF-8">
+    <title>無澀空間 ARTRIUM — 報表</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Noto Sans TC','Helvetica Neue',sans-serif;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{padding:14mm 16mm 10mm;page-break-after:always;min-height:270mm}
+      .page:last-child{page-break-after:auto}
+      table{width:100%;border-collapse:collapse}
+      .np{padding:10px 20px;background:#f0f0ec;display:flex;gap:8px;align-items:center}
+      .np button{padding:6px 16px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
+      @media print{.np{display:none!important} @page{size:A4;margin:0} .page{padding:14mm 16mm 10mm;min-height:auto}}
+    </style>
+  </head><body>
+  <div class="np">
+    <button onclick="window.print()" style="background:#1A1A18;color:#fff">🖨 列印 / 存成 PDF</button>
+    <button onclick="window.close()" style="background:#fff;border:1px solid #ccc">關閉</button>
+  </div>
+  ${body}</body></html>`;
+
   const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
+  } catch(err) {
+    alert('列印時發生錯誤：' + err.message + '\n\n請截圖回報。');
+    console.error('Print error:', err);
+  }
 }
 
 </script>
