@@ -316,7 +316,306 @@ window.addEventListener('load', function() {
   }, 4000);
 });
 </script>
-<div id="root"></div><script type="text/babel" data-presets="react,env">
+<div id="root"></div>
+<script>
+
+function openPrintWindow(project, data, sections, paymentMode) {
+  const { cats, items, pCats, pItems, gallery, banks, settings } = data;
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fmtN = n => '$ ' + Math.round(n||0).toLocaleString();
+  const catTotal = catId => items.filter(i=>i.category_id===catId).reduce((s,i)=>s+i.unit_price*i.quantity,0);
+  const workTotal = cats.reduce((s,c)=>s+catTotal(c.id),0);
+  const designFee = (project.area_sqm||0)*(project.design_fee_per_sqm||0);
+  const mgmtFee = workTotal*((project.management_fee_rate||7)/100);
+  const subtotal = workTotal+designFee+mgmtFee;
+  const tax = project.tax_enabled ? subtotal*((project.tax_rate||5)/100) : 0;
+  const purchaseTotal = pItems.reduce((s,i)=>s+i.unit_price*i.quantity,0);
+  const grandTotal = subtotal+tax;
+
+  // Payment info based on selected mode
+  const isCompany = paymentMode === 'company';
+  const payeeName = isCompany ? '無澀空間室內裝修股份有限公司' : '鄭凱群';
+  const paymentHTML = `
+    <div style="margin-top:40px;border-top:1px solid #CCC;padding-top:20px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:8px;letter-spacing:.06em">PAYMENT ITEMS</div>
+      <div style="font-size:12px;color:#555;line-height:2.2">
+        付款方式：匯款 或 開立支票（抬頭：${payeeName}）<br>
+        ${isCompany
+          ? `公司：無澀空間室內裝修股份有限公司　統一編號：90535151<br>銀行帳號：（請填入公司帳號）`
+          : `銀行：台北富邦 營業部（012）　帳號：81680008713711`
+        }
+      </div>
+    </div>
+    <div style="margin-top:20px;border-top:1px solid #E0E0E0;padding-top:16px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px;letter-spacing:.06em">THANKS FOR CHOOSING 無澀空間 ARTRIUM</div>
+      <div style="font-size:11px;color:#888;line-height:1.9">
+        如有任何問題，請聯絡 Dexigner13@gmail.com 或 0910119114。<br>
+        本報價單有效期限為開立日起 30 天。＊未列項目及尺寸增加均列為追加項目
+      </div>
+    </div>`;
+
+  // Logo block
+  const logoSrc = settings['large_logo_url'] || '';
+  const logoBlock = logoSrc
+    ? `<img src="${esc(logoSrc)}" style="height:72px;object-fit:contain">`
+    : `<div style="font-size:11px;font-weight:700;letter-spacing:.15em;color:#888">ARTRIUM</div>
+       <div style="font-size:22px;font-weight:700;margin-top:2px;letter-spacing:.05em">無澀空間</div>`;
+
+  // FROM / BILLED TO header
+  const headerBlock = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;margin-bottom:8px">FROM</div>
+        <div style="font-size:13px;line-height:2;color:#222">
+          <div style="font-weight:700">無澀空間 ARTRIUM</div>
+          <div>台北市內湖區陽光街321巷18號4樓</div>
+          <div>M / 0910119114</div>
+          <div>E / Dexigner13@gmail.com</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;margin-bottom:8px">BILLED TO</div>
+        <div style="font-size:13px;line-height:2;color:#222">
+          <div style="font-weight:700">${esc(project.client_name||'—')}</div>
+          ${project.contact_person ? `<div>${esc(project.contact_person)}</div>` : ''}
+          ${project.address ? `<div>${esc(project.address)}</div>` : ''}
+          ${project.contact_phone ? `<div>${esc(project.contact_phone)}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+
+  // Invoice meta
+  const _now = new Date();
+  const dateStr = _now.getFullYear() + '/' + String(_now.getMonth()+1).padStart(2,'0') + '/' + String(_now.getDate()).padStart(2,'0');
+  const invoiceNo = String(_now.getFullYear()).slice(2) + String(_now.getMonth()+1).padStart(2,'0') + String(_now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*900)+100);
+  const metaBlock = `
+    <div style="margin-bottom:28px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:3px">Invoice</div>
+      <div style="font-size:12px;color:#555"># ${invoiceNo}</div>
+      <div style="font-size:11px;font-weight:700;color:#555;margin-top:10px;margin-bottom:3px">Date</div>
+      <div style="font-size:12px;color:#555">${dateStr}</div>
+    </div>`;
+
+  // Table header
+  const tableHeader = `
+    <div style="border-top:1.5px solid #333;margin-bottom:0"></div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1px solid #999">
+          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:50px">S.No</th>
+          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:60px">Qty</th>
+          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em">Description</th>
+          <th style="padding:10px 0;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em">Price</th>
+        </tr>
+      </thead>`;
+
+  const dateP = _now.getFullYear() + String(_now.getMonth()+1).padStart(2,'0') + String(_now.getDate()).padStart(2,'0');
+  let body = '';
+
+  // ── Summary Page ──
+  if (sections.summary) {
+    let rowNum = 1;
+    const catRows = cats.map(c => {
+      const t = catTotal(c.id);
+      return `<tr>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#666;text-align:center">1</td>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:500;color:#222">${esc(c.name)}</td>
+        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${t?fmtN(t):'—'}</td>
+      </tr>`;
+    }).join('');
+
+    // Management fee row
+    const mgmtRow = `<tr>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:13px;color:#666">1</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA">
+        <div style="font-size:13px;font-weight:500;color:#222">管理費</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">Management Fee (${project.management_fee_rate||7}%)</div>
+      </td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${fmtN(mgmtFee)}</td>
+    </tr>`;
+
+    const designRow = designFee > 0 ? `<tr>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:13px;color:#666">1</td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA">
+        <div style="font-size:13px;font-weight:500;color:#222">設計費</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">Design Fee</div>
+      </td>
+      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${fmtN(designFee)}</td>
+    </tr>` : '';
+
+    const summaryBlock = `
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <table style="width:200px;border-collapse:collapse">
+          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Sub Total</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(subtotal)}</td></tr>
+          ${project.tax_enabled ? `<tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Tax (${project.tax_rate||5}%)</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(tax)}</td></tr>` : ''}
+          <tr style="border-top:1.5px solid #333">
+            <td style="padding:10px 0;font-size:13px;font-weight:700;text-align:right;padding-right:16px">Total</td>
+            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">${fmtN(grandTotal)}</td>
+          </tr>
+        </table>
+      </div>`;
+
+    body += `<div class="page">
+      <div style="margin-bottom:36px">${logoBlock}</div>
+      ${headerBlock}
+      ${metaBlock}
+      ${tableHeader}
+        <tbody>${catRows}${mgmtRow}${designRow}</tbody>
+      </table>
+      ${summaryBlock}
+      ${paymentHTML}
+    </div>`;
+  }
+
+  // ── Detail Pages ──
+  if (sections.detail) {
+    cats.forEach((cat, ci) => {
+      const catItems = items.filter(i => i.category_id === cat.id);
+      if (!catItems.length) return;
+      const itemRows = catItems.map((it, ii) => {
+        const total = it.unit_price * it.quantity;
+        return `<tr>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0">
+            <div style="font-size:12px;color:#333">${esc(it.name)}</div>
+            ${it.notes ? `<div style="font-size:10px;color:#AAA;margin-top:1px">${esc(it.notes)}</div>` : ''}
+          </td>
+          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
+        </tr>`;
+      }).join('');
+      const t = catTotal(cat.id);
+      body += `<div class="page">
+        <div style="margin-bottom:24px">${logoBlock}</div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:.02em;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">${String.fromCharCode(65+ci)}. ${esc(cat.name)}</div>
+        ${tableHeader}
+          <tbody>${itemRows}</tbody>
+          <tfoot>
+            <tr style="border-top:1px solid #999">
+              <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">Subtotal</td>
+              <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(t)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+    });
+  }
+
+  // ── Purchase Page ──
+  if (sections.purchase && pItems.length > 0) {
+    const pRows = pItems.map((it, ii) => {
+      const total = it.unit_price * it.quantity;
+      const pCat = pCats.find(c => c.id === it.category_id);
+      return `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0">
+          <div style="font-size:12px;color:#333">${esc(it.name)}</div>
+          ${pCat ? `<div style="font-size:10px;color:#AAA;margin-top:1px">${esc(pCat.name)}</div>` : ''}
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
+      </tr>`;
+    }).join('');
+    body += `<div class="page">
+      <div style="margin-bottom:24px">${logoBlock}</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">採購明細</div>
+      ${tableHeader}
+        <tbody>${pRows}</tbody>
+        <tfoot>
+          <tr style="border-top:1px solid #999">
+            <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">採購合計</td>
+            <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(purchaseTotal)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      ${paymentHTML}
+    </div>`;
+  }
+
+  // ── Change Records ──
+  if (sections.change && data.changeRecords && data.changeRecords.length > 0) {
+    const changes = data.changeRecords;
+    const changeRows = changes.map((c, i) => {
+      const isAdd = (c.change_sign||'add') === 'add';
+      return `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${i+1}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:12px">${esc(c.description||c.name||'')}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;text-align:center">${esc(c.unit||'式')}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:${isAdd?'#2E4D5C':'#8B2E2E'};white-space:nowrap">${isAdd?'+':'-'}${fmtN(c.amount||0)}</td>
+      </tr>`;
+    }).join('');
+    const changeTotal = changes.reduce((s,c) => s + ((c.change_sign||'add')==='add' ? (c.amount||0) : -(c.amount||0)), 0);
+    body += `<div class="page">
+      <div style="margin-bottom:24px">${logoBlock}</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">追加追減明細</div>
+      ${tableHeader.replace('S.No','#').replace('Description','項目說明').replace('Price','金額')}
+        <tbody>${changeRows}</tbody>
+        <tfoot>
+          <tr style="border-top:1px solid #999">
+            <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">追加追減合計</td>
+            <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;color:${changeTotal>=0?'#2E4D5C':'#8B2E2E'};white-space:nowrap">${changeTotal>=0?'+':''}${fmtN(Math.abs(changeTotal))}</td>
+          </tr>
+        </tfoot>
+      </table>
+      ${paymentHTML}
+    </div>`;
+  }
+
+  // ── Payment Page ──
+  if (sections.payment && data.paymentStages && data.paymentStages.length > 0) {
+    const ps = data.paymentStages;
+    const totalAmount = ps.reduce((s,st)=>s+(st.amount||0),0);
+    const currentStages = ps.filter(s=>s.is_current);
+    const currentTotal = currentStages.reduce((s,st)=>s+(st.amount||0),0);
+    const stageRows = ps.map((s,i) => {
+      const tag = s.is_current ? '本期請領' : ((s.paid_amount||0)>0?'已請領':'待請領');
+      const isCur = s.is_current;
+      return `<tr>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;font-size:11px;color:#AAA;width:40px;padding-left:10px">${String(i+1).padStart(2,'0')}</td>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:12px;color:#666;width:60px">1</td>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA">
+          <div style="font-size:13px;font-weight:${isCur?700:400};color:${isCur?'#222':'#888'}">${esc(s.name)}</div>
+          <div style="font-size:11px;color:${isCur?'#555':'#AAA'};margin-top:2px">${tag}</div>
+        </td>
+        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;text-align:right;font-size:13px;font-weight:${isCur?700:400};color:${isCur?'#222':'#AAA'};white-space:nowrap">${isCur?fmtN(s.amount||0):'—'}</td>
+      </tr>`;
+    }).join('');
+    body += `<div class="page">
+      <div style="margin-bottom:36px">${logoBlock}</div>
+      ${headerBlock}
+      <div style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:3px">Invoice</div>
+        <div style="font-size:12px;color:#555"># ${invoiceNo}</div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:10px;margin-bottom:3px">Date</div>
+        <div style="font-size:12px;color:#555">${dateStr}</div>
+        <div style="font-size:12px;color:#888;margin-top:8px">合約總金額：<strong style="color:#222;font-size:14px">${fmtN(totalAmount)}</strong></div>
+      </div>
+      ${tableHeader}
+        <tbody>${stageRows}</tbody>
+      </table>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <table style="width:200px;border-collapse:collapse">
+          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Total Amount</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(currentTotal)}</td></tr>
+          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Tax (0%)</td><td style="padding:6px 0;font-size:12px;text-align:right">$ 0</td></tr>
+          <tr style="border-top:1.5px solid #333">
+            <td style="padding:10px 0;font-size:13px;font-weight:700;text-align:right;padding-right:16px">Amount Due</td>
+            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">${fmtN(currentTotal)}</td>
+          </tr>
+        </table>
+      </div>
+      ${paymentHTML}
+    </div>`;
+  }
+
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+}
+
+</script>
+<script type="text/babel" data-presets="react,env">
+
 
 
 
@@ -960,611 +1259,6 @@ function Modal({ open, title, onClose, children, footer, size = 'md' }) {
 // ─────────────────────────────────────────
 // PRINT SYSTEM — opens a clean new window
 // ─────────────────────────────────────────
-function openPrintWindow(project, data, sections, paymentMode) {
-  const { cats, items, pCats, pItems, gallery, banks, settings } = data;
-  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const fmtN = n => '$ ' + Math.round(n||0).toLocaleString();
-  const catTotal = catId => items.filter(i=>i.category_id===catId).reduce((s,i)=>s+i.unit_price*i.quantity,0);
-  const workTotal = cats.reduce((s,c)=>s+catTotal(c.id),0);
-  const designFee = (project.area_sqm||0)*(project.design_fee_per_sqm||0);
-  const mgmtFee = workTotal*((project.management_fee_rate||7)/100);
-  const subtotal = workTotal+designFee+mgmtFee;
-  const tax = project.tax_enabled ? subtotal*((project.tax_rate||5)/100) : 0;
-  const purchaseTotal = pItems.reduce((s,i)=>s+i.unit_price*i.quantity,0);
-  const grandTotal = subtotal+tax;
-
-  // Payment info based on selected mode
-  const isCompany = paymentMode === 'company';
-  const payeeName = isCompany ? '無澀空間室內裝修股份有限公司' : '鄭凱群';
-  const paymentHTML = `
-    <div style="margin-top:40px;border-top:1px solid #CCC;padding-top:20px">
-      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:8px;letter-spacing:.06em">PAYMENT ITEMS</div>
-      <div style="font-size:12px;color:#555;line-height:2.2">
-        付款方式：匯款 或 開立支票（抬頭：${payeeName}）<br>
-        ${isCompany
-          ? `公司：無澀空間室內裝修股份有限公司　統一編號：90535151<br>銀行帳號：（請填入公司帳號）`
-          : `銀行：台北富邦 營業部（012）　帳號：81680008713711`
-        }
-      </div>
-    </div>
-    <div style="margin-top:20px;border-top:1px solid #E0E0E0;padding-top:16px">
-      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px;letter-spacing:.06em">THANKS FOR CHOOSING 無澀空間 ARTRIUM</div>
-      <div style="font-size:11px;color:#888;line-height:1.9">
-        如有任何問題，請聯絡 Dexigner13@gmail.com 或 0910119114。<br>
-        本報價單有效期限為開立日起 30 天。＊未列項目及尺寸增加均列為追加項目
-      </div>
-    </div>`;
-
-  // Logo block
-  const logoSrc = settings['large_logo_url'] || '';
-  const logoBlock = logoSrc
-    ? `<img src="${esc(logoSrc)}" style="height:72px;object-fit:contain">`
-    : `<div style="font-size:11px;font-weight:700;letter-spacing:.15em;color:#888">ARTRIUM</div>
-       <div style="font-size:22px;font-weight:700;margin-top:2px;letter-spacing:.05em">無澀空間</div>`;
-
-  // FROM / BILLED TO header
-  const headerBlock = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;margin-bottom:8px">FROM</div>
-        <div style="font-size:13px;line-height:2;color:#222">
-          <div style="font-weight:700">無澀空間 ARTRIUM</div>
-          <div>台北市內湖區陽光街321巷18號4樓</div>
-          <div>M / 0910119114</div>
-          <div>E / Dexigner13@gmail.com</div>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;margin-bottom:8px">BILLED TO</div>
-        <div style="font-size:13px;line-height:2;color:#222">
-          <div style="font-weight:700">${esc(project.client_name||'—')}</div>
-          ${project.contact_person ? `<div>${esc(project.contact_person)}</div>` : ''}
-          ${project.address ? `<div>${esc(project.address)}</div>` : ''}
-          ${project.contact_phone ? `<div>${esc(project.contact_phone)}</div>` : ''}
-        </div>
-      </div>
-    </div>`;
-
-  // Invoice meta
-  const _now = new Date();
-  const dateStr = _now.getFullYear() + '/' + String(_now.getMonth()+1).padStart(2,'0') + '/' + String(_now.getDate()).padStart(2,'0');
-  const invoiceNo = String(_now.getFullYear()).slice(2) + String(_now.getMonth()+1).padStart(2,'0') + String(_now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*900)+100);
-  const metaBlock = `
-    <div style="margin-bottom:28px">
-      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:3px">Invoice</div>
-      <div style="font-size:12px;color:#555"># ${invoiceNo}</div>
-      <div style="font-size:11px;font-weight:700;color:#555;margin-top:10px;margin-bottom:3px">Date</div>
-      <div style="font-size:12px;color:#555">${dateStr}</div>
-    </div>`;
-
-  // Table header
-  const tableHeader = `
-    <div style="border-top:1.5px solid #333;margin-bottom:0"></div>
-    <table style="width:100%;border-collapse:collapse">
-      <thead>
-        <tr style="border-bottom:1px solid #999">
-          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:50px">S.No</th>
-          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:60px">Qty</th>
-          <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em">Description</th>
-          <th style="padding:10px 0;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em">Price</th>
-        </tr>
-      </thead>`;
-
-  const dateP = _now.getFullYear() + String(_now.getMonth()+1).padStart(2,'0') + String(_now.getDate()).padStart(2,'0');
-  let body = '';
-
-  // ── Summary Page ──
-  if (sections.summary) {
-    let rowNum = 1;
-    const catRows = cats.map(c => {
-      const t = catTotal(c.id);
-      return `<tr>
-        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
-        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#666;text-align:center">1</td>
-        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:500;color:#222">${esc(c.name)}</td>
-        <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${t?fmtN(t):'—'}</td>
-      </tr>`;
-    }).join('');
-
-    // Management fee row
-    const mgmtRow = `<tr>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:13px;color:#666">1</td>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA">
-        <div style="font-size:13px;font-weight:500;color:#222">管理費</div>
-        <div style="font-size:11px;color:#888;margin-top:2px">Management Fee (${project.management_fee_rate||7}%)</div>
-      </td>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${fmtN(mgmtFee)}</td>
-    </tr>`;
-
-    const designRow = designFee > 0 ? `<tr>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;color:#888">${String(rowNum++).padStart(2,'0')}</td>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:13px;color:#666">1</td>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA">
-        <div style="font-size:13px;font-weight:500;color:#222">設計費</div>
-        <div style="font-size:11px;color:#888;margin-top:2px">Design Fee</div>
-      </td>
-      <td style="padding:13px 0;border-bottom:1px solid #EBEBEA;font-size:13px;font-weight:600;text-align:right;white-space:nowrap">${fmtN(designFee)}</td>
-    </tr>` : '';
-
-    const summaryBlock = `
-      <div style="display:flex;justify-content:flex-end;margin-top:6px">
-        <table style="width:200px;border-collapse:collapse">
-          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Sub Total</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(subtotal)}</td></tr>
-          ${project.tax_enabled ? `<tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Tax (${project.tax_rate||5}%)</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(tax)}</td></tr>` : ''}
-          <tr style="border-top:1.5px solid #333">
-            <td style="padding:10px 0;font-size:13px;font-weight:700;text-align:right;padding-right:16px">Total</td>
-            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">${fmtN(grandTotal)}</td>
-          </tr>
-        </table>
-      </div>`;
-
-    body += `<div class="page">
-      <div style="margin-bottom:36px">${logoBlock}</div>
-      ${headerBlock}
-      ${metaBlock}
-      ${tableHeader}
-        <tbody>${catRows}${mgmtRow}${designRow}</tbody>
-      </table>
-      ${summaryBlock}
-      ${paymentHTML}
-    </div>`;
-  }
-
-  // ── Detail Pages ──
-  if (sections.detail) {
-    cats.forEach((cat, ci) => {
-      const catItems = items.filter(i => i.category_id === cat.id);
-      if (!catItems.length) return;
-      const itemRows = catItems.map((it, ii) => {
-        const total = it.unit_price * it.quantity;
-        return `<tr>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0">
-            <div style="font-size:12px;color:#333">${esc(it.name)}</div>
-            ${it.notes ? `<div style="font-size:10px;color:#AAA;margin-top:1px">${esc(it.notes)}</div>` : ''}
-          </td>
-          <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
-        </tr>`;
-      }).join('');
-      const t = catTotal(cat.id);
-      body += `<div class="page">
-        <div style="margin-bottom:24px">${logoBlock}</div>
-        <div style="font-size:13px;font-weight:700;letter-spacing:.02em;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">${String.fromCharCode(65+ci)}. ${esc(cat.name)}</div>
-        ${tableHeader}
-          <tbody>${itemRows}</tbody>
-          <tfoot>
-            <tr style="border-top:1px solid #999">
-              <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">Subtotal</td>
-              <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(t)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>`;
-    });
-  }
-
-  // ── Purchase Page ──
-  if (sections.purchase && pItems.length > 0) {
-    const pRows = pItems.map((it, ii) => {
-      const total = it.unit_price * it.quantity;
-      const pCat = pCats.find(c => c.id === it.category_id);
-      return `<tr>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${ii+1}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;width:70px;text-align:center">${it.quantity} ${esc(it.unit||'')}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0">
-          <div style="font-size:12px;color:#333">${esc(it.name)}</div>
-          ${pCat ? `<div style="font-size:10px;color:#AAA;margin-top:1px">${esc(pCat.name)}</div>` : ''}
-        </td>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:#333;white-space:nowrap">${total ? fmtN(total) : '—'}</td>
-      </tr>`;
-    }).join('');
-    body += `<div class="page">
-      <div style="margin-bottom:24px">${logoBlock}</div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">採購明細</div>
-      ${tableHeader}
-        <tbody>${pRows}</tbody>
-        <tfoot>
-          <tr style="border-top:1px solid #999">
-            <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">採購合計</td>
-            <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;white-space:nowrap">${fmtN(purchaseTotal)}</td>
-          </tr>
-        </tfoot>
-      </table>
-      ${paymentHTML}
-    </div>`;
-  }
-
-  // ── Change Records ──
-  if (sections.change && data.changeRecords && data.changeRecords.length > 0) {
-    const changes = data.changeRecords;
-    const changeRows = changes.map((c, i) => {
-      const isAdd = (c.change_sign||'add') === 'add';
-      return `<tr>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#AAA;width:40px;padding-left:10px">${i+1}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:12px">${esc(c.description||c.name||'')}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:11px;color:#666;text-align:center">${esc(c.unit||'式')}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #F0F0F0;text-align:right;font-size:12px;color:${isAdd?'#2E4D5C':'#8B2E2E'};white-space:nowrap">${isAdd?'+':'-'}${fmtN(c.amount||0)}</td>
-      </tr>`;
-    }).join('');
-    const changeTotal = changes.reduce((s,c) => s + ((c.change_sign||'add')==='add' ? (c.amount||0) : -(c.amount||0)), 0);
-    body += `<div class="page">
-      <div style="margin-bottom:24px">${logoBlock}</div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid #333">追加追減明細</div>
-      ${tableHeader.replace('S.No','#').replace('Description','項目說明').replace('Price','金額')}
-        <tbody>${changeRows}</tbody>
-        <tfoot>
-          <tr style="border-top:1px solid #999">
-            <td colspan="3" style="padding:8px 0;text-align:right;font-size:12px;color:#888;padding-right:16px">追加追減合計</td>
-            <td style="padding:8px 0;text-align:right;font-size:13px;font-weight:700;color:${changeTotal>=0?'#2E4D5C':'#8B2E2E'};white-space:nowrap">${changeTotal>=0?'+':''}${fmtN(Math.abs(changeTotal))}</td>
-          </tr>
-        </tfoot>
-      </table>
-      ${paymentHTML}
-    </div>`;
-  }
-
-  // ── Payment Page ──
-  if (sections.payment && data.paymentStages && data.paymentStages.length > 0) {
-    const ps = data.paymentStages;
-    const totalAmount = ps.reduce((s,st)=>s+(st.amount||0),0);
-    const currentStages = ps.filter(s=>s.is_current);
-    const currentTotal = currentStages.reduce((s,st)=>s+(st.amount||0),0);
-    const stageRows = ps.map((s,i) => {
-      const tag = s.is_current ? '本期請領' : ((s.paid_amount||0)>0?'已請領':'待請領');
-      const isCur = s.is_current;
-      return `<tr>
-        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;font-size:11px;color:#AAA;width:40px;padding-left:10px">${String(i+1).padStart(2,'0')}</td>
-        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;text-align:center;font-size:12px;color:#666;width:60px">1</td>
-        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA">
-          <div style="font-size:13px;font-weight:${isCur?700:400};color:${isCur?'#222':'#888'}">${esc(s.name)}</div>
-          <div style="font-size:11px;color:${isCur?'#555':'#AAA'};margin-top:2px">${tag}</div>
-        </td>
-        <td style="padding:12px 0;border-bottom:1px solid #EBEBEA;text-align:right;font-size:13px;font-weight:${isCur?700:400};color:${isCur?'#222':'#AAA'};white-space:nowrap">${isCur?fmtN(s.amount||0):'—'}</td>
-      </tr>`;
-    }).join('');
-    body += `<div class="page">
-      <div style="margin-bottom:36px">${logoBlock}</div>
-      ${headerBlock}
-      <div style="margin-bottom:20px">
-        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:3px">Invoice</div>
-        <div style="font-size:12px;color:#555"># ${invoiceNo}</div>
-        <div style="font-size:11px;font-weight:700;color:#555;margin-top:10px;margin-bottom:3px">Date</div>
-        <div style="font-size:12px;color:#555">${dateStr}</div>
-        <div style="font-size:12px;color:#888;margin-top:8px">合約總金額：<strong style="color:#222;font-size:14px">${fmtN(totalAmount)}</strong></div>
-      </div>
-      ${tableHeader}
-        <tbody>${stageRows}</tbody>
-      </table>
-      <div style="display:flex;justify-content:flex-end;margin-top:6px">
-        <table style="width:200px;border-collapse:collapse">
-          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Total Amount</td><td style="padding:6px 0;font-size:12px;text-align:right;white-space:nowrap">${fmtN(currentTotal)}</td></tr>
-          <tr><td style="padding:6px 0;font-size:12px;color:#555;text-align:right;padding-right:16px">Tax (0%)</td><td style="padding:6px 0;font-size:12px;text-align:right">$ 0</td></tr>
-          <tr style="border-top:1.5px solid #333">
-            <td style="padding:10px 0;font-size:13px;font-weight:700;text-align:right;padding-right:16px">Amount Due</td>
-            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">${fmtN(currentTotal)}</td>
-          </tr>
-        </table>
-      </div>
-      ${paymentHTML}
-    </div>`;
-  }
-
-  // ── Summary Page ──
-  if (sections.summary) {
-    const catRows = cats.map((c,i) => {
-      const t = catTotal(c.id);
-      return `<tr><td class="idx">${String.fromCharCode(65+i)}</td><td>${esc(c.name)}</td><td class="num" style="color:${t?'#111':'#CCC'}">${fmtN(t)}</td></tr>`;
-    }).join('');
-    const notesLines = esc(project.notes||'').replace(/\n/g,'<br>');
-
-    body += `
-    <div class="page">
-      <div class="logo-block">${logoBlock}</div>
-      <table class="info-table">
-        <tr>
-          <td class="lbl">專案名稱</td>
-          <td class="val project-name" colspan="3">${esc(project.name)}</td>
-        </tr>
-        <tr>
-          <td class="lbl">客戶名稱</td><td class="val">${esc(project.client_name)}</td>
-          <td class="lbl">日期</td><td class="val">${esc((project.project_date||'').replace(/-/g,'/'))}</td>
-        </tr>
-        <tr>
-          <td class="lbl">聯絡人</td><td class="val">${esc(project.contact_person)}</td>
-          <td class="lbl">聯絡電話</td><td class="val">${esc(project.contact_phone)}</td>
-        </tr>
-        <tr>
-          <td class="lbl">工程地址</td><td class="val" colspan="3">${esc(project.address)}</td>
-        </tr>
-      </table>
-      <div class="section-title">工程費用總表</div>
-      <table class="main-table">
-        <thead><tr><th style="width:45px">項次</th><th>項目名稱</th><th class="num" style="width:100px">報價金額</th></tr></thead>
-        <tbody>${catRows}</tbody>
-      </table>
-      <div class="totals">
-        <div class="total-row"><span>工程小計</span><span>${fmtN(workTotal)}</span></div>
-        <div class="total-row"><span>工程管理費（${project.management_fee_rate||7}%）</span><span>${fmtN(mgmtFee)}</span></div>
-        <div class="total-row"><span>設計規劃費（${project.area_sqm||0}坪 × ${(project.design_fee_per_sqm||0).toLocaleString()}）</span><span>${fmtN(designFee)}</span></div>
-        ${project.tax_enabled?`<div class="total-row"><span>營業稅（${project.tax_rate||5}%）</span><span>${fmtN(tax)}</span></div>`:''}
-        <div class="total-row red"><span>採購設備/材料總計（詳見採購明細）</span><span>${fmtN(purchaseTotal)}</span></div>
-        <div class="total-row grand"><span>專案總結（含工程與採購）</span><span>${fmtN(grandTotal)}</span></div>
-      </div>
-      <div style="margin-top:16px">
-        <div class="section-title">注意事項與條款</div>
-        <div style="font-size:10.5px;border:1px solid #CCC;border-radius:3px;padding:8px 10px;line-height:1.9;min-height:90px;width:100%">${notesLines}</div>
-      </div>
-      <div style="display:flex;gap:16px;align-items:flex-start;margin-top:8px">
-        <div style="flex:1">${bankHTML}</div>
-        <div style="flex-shrink:0;text-align:center;margin-top:14px">
-          <div style="border:1px dashed #AAA;border-radius:4px;width:230px;height:80px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;padding:6px 10px">
-            <span style="font-size:10px;color:#666">業主簽名確認</span>
-            <span style="font-size:9px;color:#BBB;align-self:flex-end">日期：____________</span>
-          </div>
-        </div>
-      </div>
-      <div style="flex:1"></div>
-      <div style="padding-top:12px;border-top:1px solid #DDD;text-align:center;font-size:9px;color:#999">
-        ${footerContent}
-      </div>
-    </div>`;
-  }
-
-  // ── Work Detail Pages ──
-  if (sections.work) {
-    let workBody = `<div style="text-align:center;font-size:18px;font-weight:700;letter-spacing:0.5em;padding-bottom:12px;margin-bottom:16px">工 程 明 細</div>`;
-    cats.forEach((cat,ci) => {
-      const catItemsList = items.filter(i=>i.category_id===cat.id);
-      let rows = '';
-      catItemsList.forEach(item => {
-        if (item.unit === '__note__') {
-          // Text/spacer row
-          rows += `<tr><td colspan="6" style="padding:5px 10px;font-size:11px;color:#666;font-style:italic;border-bottom:1px dashed #DDD">${esc(item.name||'')}</td></tr>`;
-        } else {
-          rows += `<tr>
-            <td style="padding:5px 10px;border-bottom:1px solid #EBEBEA">${esc(item.name)}</td>
-            <td style="padding:5px 6px;text-align:center;border-bottom:1px solid #EBEBEA">${esc(item.unit)}</td>
-            <td style="padding:5px 6px;text-align:center;border-bottom:1px solid #EBEBEA">${item.quantity}</td>
-            <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${item.unit_price?(+item.unit_price).toLocaleString():'-'}</td>
-            <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${item.unit_price?fmtN(item.unit_price*item.quantity):'-'}</td>
-            <td style="padding:5px 6px;font-size:10px;color:#666;border-bottom:1px solid #EBEBEA">${esc(item.notes)}</td>
-          </tr>`;
-        }
-      });
-      workBody += `
-        <div style="margin-bottom:18px">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;border-left:3px solid #333;padding-left:8px;margin-bottom:4px;page-break-after:avoid">
-            <span style="font-size:13px;font-weight:700">${String.fromCharCode(65+ci)}.  ${esc(cat.name)}</span>
-            <span style="font-size:11px;color:#555">小計: ${fmtN(catTotal(cat.id))}</span>
-          </div>
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed">
-            <thead>
-              <tr style="border-bottom:1.5px solid #333">
-                <th style="padding:5px 10px;text-align:left;font-weight:600;color:#333;width:320px">細項名稱</th>
-                <th style="padding:5px 6px;text-align:center;font-weight:600;color:#333;width:40px">單位</th>
-                <th style="padding:5px 6px;text-align:center;font-weight:600;color:#333;width:44px">數量</th>
-                <th style="padding:5px 6px;text-align:right;font-weight:600;color:#333;width:76px">單價</th>
-                <th style="padding:5px 6px;text-align:right;font-weight:600;color:#333;width:88px">總計</th>
-                <th style="padding:5px 6px;text-align:left;font-weight:600;color:#333;">備註</th>
-              </tr>
-            </thead>
-            <tbody>${rows||'<tr><td colspan="6" style="padding:8px 10px;color:#CCC;text-align:center">（無細項）</td></tr>'}</tbody>
-          </table>
-        </div>`;
-    });
-    body += `<div class="page">${workBody}<div class="footer">${footerContent}</div></div>`;
-  }
-
-  // ── Purchase Pages ──
-  if (sections.purchase && pCats.length > 0) {
-    let pBody = `<div style="text-align:center;font-size:16px;font-weight:700;letter-spacing:0.4em;border-bottom:1px solid #CCC;padding-bottom:8px;margin-bottom:14px">採 購 明 細</div>`;
-    pCats.forEach((cat,ci) => {
-      const catItems = pItems.filter(i=>i.category_id===cat.id);
-      const cTotal = catItems.reduce((s,i)=>s+i.unit_price*i.quantity,0);
-      const rows = catItems.map(item=>`<tr>
-        <td>${esc(item.name)}</td>
-        <td class="num">${esc(item.unit)}</td>
-        <td class="num">${item.quantity}</td>
-        <td class="num">${(+item.unit_price||0).toLocaleString()}</td>
-        <td class="num">${fmtN(item.unit_price*item.quantity)}</td>
-        <td style="font-size:10px;color:#666">${esc(item.notes)}</td>
-      </tr>`).join('');
-      pBody += `
-        <div class="cat-block">
-          <div class="cat-header"><span>${ci+1}. ${esc(cat.name)}</span><span>小計: ${fmtN(cTotal)}</span></div>
-          <table class="main-table">
-            <thead><tr><th>物品/設備名稱</th><th class="num" style="width:38px">單位</th><th class="num" style="width:42px">數量</th><th class="num" style="width:72px">報價單價</th><th class="num" style="width:85px">報價總計</th><th style="width:85px">備註</th></tr></thead>
-            <tbody>${rows||'<tr><td colspan="6" class="empty">（尚無細項資料）</td></tr>'}</tbody>
-          </table>
-        </div>`;
-    });
-    body += `<div class="page">${pBody}<div class="footer">${footerContent}</div></div>`;
-  }
-
-  // ── Schedule Page ──
-  if (sections.schedule && data.scheduleItems && data.scheduleItems.length > 0) {
-    const si = data.scheduleItems;
-    const se = data.scheduleEvents || [];
-    const allDates = [...si.map(i=>i.start_date),...si.map(i=>i.end_date),...se.map(e=>e.start_date),...se.map(e=>e.end_date)].filter(Boolean).sort();
-    const gStart = allDates[0] ? new Date(allDates[0]) : new Date();
-    const gEnd = allDates[allDates.length-1] ? new Date(allDates[allDates.length-1]) : new Date();
-    gStart.setDate(gStart.getDate() - gStart.getDay() + 1);
-    const weeks = []; const cur = new Date(gStart);
-    while (cur <= gEnd || weeks.length < 4) {
-      const ws = new Date(cur), we = new Date(cur); we.setDate(we.getDate()+6);
-      weeks.push({start:ws,end:we}); cur.setDate(cur.getDate()+7); if(weeks.length>16) break;
-    }
-    const fmt2 = d => `${d.getMonth()+1}/${d.getDate()}`;
-    const inWeek = (s,e,w) => { if(!s||!e) return false; return new Date(s)<=w.end && new Date(e)>=w.start; };
-    const schedCats = [...new Set(si.map(i=>i.category_name))];
-    const weekHdrs = weeks.map((w,wi)=>`<th style="text-align:center;font-size:10px;min-width:60px">第${wi+1}週<br>${fmt2(w.start)}～${fmt2(w.end)}</th>`).join('');
-    // Events row
-    let eventsRow = '';
-    if (se.length > 0) {
-      const evCells = weeks.map(w => {
-        const active = se.filter(e=>inWeek(e.start_date,e.end_date,w));
-        return `<td style="padding:3px;background:#F0F0F0">${active.map(e=>`<div style="background:#C8C8C8;border-radius:3px;padding:1px 5px;font-size:10px">${esc(e.name)}</div>`).join('')}</td>`;
-      }).join('');
-      eventsRow = `<tr><td style="padding:5px 8px;font-size:11px;font-weight:600;color:#444;background:#F0F0F0">特殊事件及節日</td>${evCells}</tr>`;
-    }
-    const rows = schedCats.map(cat => {
-      const catItems = si.filter(i=>i.category_name===cat);
-      const cells = weeks.map(w => {
-        const active = catItems.filter(i=>inWeek(i.start_date,i.end_date,w));
-        return `<td style="padding:3px;vertical-align:middle">${active.map(i=>`<div style="background:#2E4D5C;color:#fff;border-radius:3px;padding:1px 5px;font-size:10px;white-space:nowrap">${esc(i.stage_name||cat)}</div>`).join('')}</td>`;
-      }).join('');
-      return `<tr><td style="padding:5px 8px;font-size:11px;font-weight:500;white-space:nowrap;border-bottom:1px solid #EEE">${esc(cat)}</td>${cells}</tr>`;
-    }).join('');
-    body += `<div class="page">
-      <div style="text-align:center;font-size:16px;font-weight:700;letter-spacing:0.4em;border-bottom:1px solid #CCC;padding-bottom:8px;margin-bottom:14px">進 度 排 程</div>
-      <div style="overflow-x:auto">
-        <table style="border-collapse:collapse;font-size:11px;width:100%">
-          <thead><tr><th style="text-align:left;padding:5px 8px;background:#F5F5F3;border-bottom:1.5px solid #666;white-space:nowrap">工種</th>${weekHdrs}</tr></thead>
-          <tbody>${eventsRow}${rows}</tbody>
-        </table>
-      </div>
-      <div class="footer">${footerContent}</div>
-    </div>`;
-  }
-
-  // ── Gallery Pages ──
-  if (sections.gallery && gallery.length > 0) {
-    const cards = gallery.map(g=>`
-      <div class="gallery-card">
-        ${g.image_url
-          ? `<div style="width:100%;height:130px;display:flex;align-items:center;justify-content:center;background:#F8F8F6;overflow:hidden"><img src="${esc(g.image_url)}" style="max-width:100%;max-height:130px;object-fit:contain;display:block"></div>`
-          : `<div style="height:130px;background:#F5F5F3;display:flex;align-items:center;justify-content:center;color:#CCC;font-size:12px">無圖片</div>`}
-        <div style="padding:5px 7px">
-          <div style="font-weight:600;font-size:11px">${esc(g.name||'未命名')}</div>
-          ${g.description?`<div style="font-size:10px;color:#666;margin-top:2px">${esc(g.description)}</div>`:''}
-          ${g.price?`<div style="font-size:10px;color:#2E4D5C;margin-top:2px">參考價格：${fmtN(g.price)}</div>`:''}
-        </div>
-      </div>`).join('');
-    body += `<div class="page">
-      <div style="text-align:center;font-size:14px;font-weight:700;letter-spacing:0.2em;border-bottom:1px solid #CCC;padding-bottom:8px;margin-bottom:14px">附 件 ：施 工 做 法 與 採 購 補 充 說 明</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${cards}</div>
-      <div class="footer">${footerContent}</div>
-    </div>`;
-  }
-
-  // ── Payment Page ──
-  if (sections.payment && data.paymentStages && data.paymentStages.length > 0) {
-    const ps = data.paymentStages;
-    const currentStage = ps.find(s => s.is_current)
-      || ps.find(s => (s.paid_amount || 0) < (s.amount || 0))
-      || ps[0];
-    const totalAmount = ps.reduce((s, st) => s + (st.amount || 0), 0);
-    const totalPaid = ps.reduce((s, st) => s + (st.paid_amount || 0), 0);
-    const unpaid = totalAmount - totalPaid;
-    const currentIdx = ps.findIndex(s => s.id === (currentStage && currentStage.id));
-    const prevUnpaid = (currentIdx > 0 ? ps.slice(0, currentIdx) : [])
-      .reduce((s, st) => s + Math.max(0, (st.amount||0) - (st.paid_amount||0)), 0);
-    const currentAmt = currentStage ? (currentStage.amount || 0) : 0;
-    const totalDue = currentAmt + prevUnpaid;
-
-    const stageStatusLabel = function(s) {
-      if (!s.amount) return '未設定';
-      if ((s.paid_amount||0) >= s.amount) return '已結清';
-      if ((s.paid_amount||0) > 0) return '部分付款';
-      return '未付款';
-    };
-    const stageStatusColor = function(s) {
-      const l = stageStatusLabel(s);
-      if (l === '已結清') return '#3A5240';
-      if (l === '部分付款') return '#6B4835';
-      return '#888';
-    };
-
-    const stageRows = ps.map(function(s) { return '<tr style="border-bottom:1px solid #EBEBEA">' +
-      '<td style="padding:6px 10px;font-weight:' + (s.is_current?'700':'400') + '">' +
-        (s.is_current ? '<span style="color:#8B2E2E">[本期]</span> ' : '') + esc(s.name) + '</td>' +
-      '<td style="padding:6px 10px;text-align:right">' + fmtN(s.amount||0) + '</td>' +
-      '<td style="padding:6px 10px;text-align:right;color:' + ((s.paid_amount||0)>0?'#3A5240':'#888') + '">' + ((s.paid_amount||0)>0?fmtN(s.paid_amount):'–') + '</td>' +
-      '<td style="padding:6px 10px;text-align:center;color:#666">' + (s.paid_date||'–') + '</td>' +
-      '<td style="padding:6px 10px;text-align:center;color:' + stageStatusColor(s) + ';font-weight:500">' + stageStatusLabel(s) + '</td>' +
-    '</tr>'; }).join('');
-
-    const openDate = project.project_date ? project.project_date.replace(/-/g,'/') : '（未填寫日期）';
-
-    body += '<div class="page">' +
-      '<div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:0.3em;margin-bottom:18px">工程請款單</div>' +
-      '<div style="border-bottom:1.5px solid #333;margin-bottom:16px"></div>' +
-      '<table style="width:100%;font-size:11.5px;margin-bottom:16px"><tr>' +
-        '<td style="padding:4px 0;width:50%"><strong>工程名稱：</strong>' + esc(project.name) + '</td>' +
-        '<td style="padding:4px 0"><strong>開單日期：</strong>' + openDate + '</td>' +
-      '</tr><tr>' +
-        '<td style="padding:4px 0"><strong>聯 絡 人：</strong>' + esc(project.contact_person||'') + '</td>' +
-        '<td style="padding:4px 0"><strong>聯絡電話：</strong>' + esc(project.contact_phone||'') + '</td>' +
-      '</tr></table>' +
-      '<div class="section-title" style="margin-bottom:8px">各期付款明細總表</div>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">' +
-        '<thead><tr style="background:#F2F2F0;border-bottom:1.5px solid #666">' +
-          '<th style="padding:6px 10px;text-align:left">階段名稱</th>' +
-          '<th style="padding:6px 10px;text-align:right">應收金額</th>' +
-          '<th style="padding:6px 10px;text-align:right">已付金額</th>' +
-          '<th style="padding:6px 10px;text-align:center">付款日期</th>' +
-          '<th style="padding:6px 10px;text-align:center">結算狀態</th>' +
-        '</tr></thead>' +
-        '<tbody>' + stageRows + '</tbody>' +
-        '<tfoot><tr style="background:#F5F5F5;border-top:1.5px solid #666;font-weight:700">' +
-          '<td style="padding:7px 10px;text-align:right">總計</td>' +
-          '<td style="padding:7px 10px;text-align:right">' + fmtN(totalAmount) + '</td>' +
-          '<td style="padding:7px 10px;text-align:right;color:#3A5240">' + fmtN(totalPaid) + '</td>' +
-          '<td colspan="2" style="padding:7px 10px;text-align:center;color:#8B2E2E">未收尾款：' + fmtN(unpaid) + '</td>' +
-        '</tr></tfoot>' +
-      '</table>' +
-      (currentStage ?
-        '<div style="border:1.5px dashed #AAA;border-radius:6px;padding:16px 20px;margin-bottom:16px">' +
-          '<div style="font-size:11px;color:#666;margin-bottom:6px">總專案金額：' + fmtN(totalAmount) + '</div>' +
-          '<div style="font-size:13px;font-weight:700;margin-bottom:12px">本期請款項目：' + esc(currentStage.name) + '</div>' +
-          '<div style="font-size:11px;margin-bottom:12px;border-bottom:1px dashed #CCC;padding-bottom:10px">' +
-            '本期表定金額：' + fmtN(currentAmt) +
-            (prevUnpaid>0 ? '　　<span style="color:#6B4835">前期未結餘額：+' + fmtN(prevUnpaid) + '</span>' : '') +
-          '</div>' +
-          '<div style="text-align:center;font-size:17px;font-weight:700;color:#8B2E2E;letter-spacing:0.05em">本期總計應匯款：' + fmtN(totalDue) + '</div>' +
-        '</div>' : '') +
-      bankHTML +
-      '<div style="flex:1"></div>' +
-      '<div style="display:flex;justify-content:flex-end;margin-bottom:16px">' +
-        '<div style="border:1px dashed #AAA;border-radius:4px;width:220px;height:80px;padding:8px 12px;display:flex;flex-direction:column;justify-content:space-between">' +
-          '<span style="font-size:10px;color:#666">業主簽收確認</span>' +
-          '<span style="font-size:9px;color:#BBB;align-self:flex-end">日期：____________</span>' +
-        '</div>' +
-      '</div>' +
-      '<div style="padding-top:12px;border-top:1px solid #DDD;text-align:center;font-size:9px;color:#999">' + footerContent + '</div>' +
-    '</div>';
-  }
-
-  const html = `<!DOCTYPE html><html lang="zh-TW"><head>
-    <meta charset="UTF-8">
-    <title>${dateP} ${esc(project.name)} — 無澀空間 ARTRIUM</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:'Noto Sans TC','Helvetica Neue',sans-serif;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      .page{padding:14mm 16mm 10mm;page-break-after:always;min-height:270mm}
-      .page:last-child{page-break-after:auto}
-      table{width:100%;border-collapse:collapse}
-      .np{padding:10px 20px;background:#f0f0ec;display:flex;gap:8px;align-items:center}
-      .np button{padding:6px 16px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
-      @media print{.np{display:none!important} @page{size:A4;margin:0} .page{padding:14mm 16mm 10mm;min-height:auto}}
-    </style>
-  </head><body>
-  <div class="np">
-    <button onclick="window.print()" style="background:#1A1A18;color:#fff">🖨 列印 / 存成 PDF</button>
-    <button onclick="window.close()" style="background:#fff;border:1px solid #ccc">關閉</button>
-    <span style="font-size:11px;color:#888;margin-left:8px">${esc(project.name)} — 無澀空間 ARTRIUM</span>
-  </div>
-  ${body}</body></html>`;
-
-  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(()=>URL.revokeObjectURL(url), 30000);
-}
-
 function PrintModal({ open, onClose, project }) {
   const [sections, setSections] = useState({ summary: true, work: true, purchase: false, schedule: false, gallery: false, payment: false, change: false });
   const [paymentMode, setPaymentMode] = useState('personal');
