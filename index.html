@@ -659,12 +659,14 @@ function openPrintWindow(project, data, sections, paymentMode) {
       <span style="color:#888">※ 請於收到後三日內完成匯款，感謝您的配合！</span>
     </div>`;
 
+  // paymentBlock 定義在頂層，所有頁面都可使用
+  const paymentBlock = isCompany ? `付款方式：匯款 或 開立支票（抬頭：無澀空間室內裝修股份有限公司）<br>公司：無澀空間室內裝修股份有限公司　統一編號：90535151` : `付款方式：匯款 或 開立支票（抬頭：鄭凱群）<br>銀行：台北富邦 營業部（012）　帳號：81680008713711`;
+
   // ── Summary Page ──
   if (sections.summary) {
     const _now = new Date();
     const dateStr = _now.getFullYear() + '/' + String(_now.getMonth() + 1).padStart(2, '0') + '/' + String(_now.getDate()).padStart(2, '0');
     const invoiceNo = String(_now.getFullYear()).slice(2) + String(_now.getMonth() + 1).padStart(2, '0') + String(_now.getDate()).padStart(2, '0') + '-' + String(Math.floor(Math.random() * 900) + 100);
-    const paymentBlock = isCompany ? `付款方式：匯款 或 開立支票（抬頭：無澀空間室內裝修股份有限公司）<br>公司：無澀空間室內裝修股份有限公司　統一編號：90535151` : `付款方式：匯款 或 開立支票（抬頭：鄭凱群）<br>銀行：台北富邦 營業部（012）　帳號：81680008713711`;
     let rowNum = 1;
     const catRows = cats.map(c => {
       const t = catTotal(c.id);
@@ -729,10 +731,10 @@ function openPrintWindow(project, data, sections, paymentMode) {
         <thead>
           <tr style="border-bottom:1px solid #999">
             <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:50px">S.No</th>
-            <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em">Description</th>
+            <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:45%">Description</th>
             <th style="padding:10px 0;text-align:center;font-size:11px;font-weight:700;letter-spacing:.06em;width:60px">Qty</th>
             <th style="padding:10px 0;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em;width:110px">Price</th>
-            <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;width:60px;padding-left:12px">Note</th>
+            <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;padding-left:12px">Note</th>
           </tr>
         </thead>
         <tbody>${catRows}${mgmtRow}</tbody>
@@ -774,16 +776,18 @@ function openPrintWindow(project, data, sections, paymentMode) {
       </div>`;
     // ── 表格欄頭：每頁重複 ──
     const workThead = `<tr style="border-bottom:1.5px solid #333">
-      <th style="padding:5px 10px;text-align:left;font-weight:600;color:#333">細項名稱</th>
+      <th style="padding:5px 10px;text-align:left;font-weight:600;color:#333;width:55%">細項名稱</th>
       <th style="padding:5px 6px;text-align:center;font-weight:600;color:#333;width:40px">單位</th>
       <th style="padding:5px 6px;text-align:center;font-weight:600;color:#333;width:44px">數量</th>
-      <th style="padding:5px 6px;text-align:right;font-weight:600;color:#333;width:76px">報價單價</th>
-      <th style="padding:5px 6px;text-align:right;font-weight:600;color:#333;width:88px">費用</th>
-      <th style="padding:5px 6px;text-align:left;font-weight:600;color:#333;width:80px">備註</th>
+      <th style="padding:5px 6px;text-align:right;font-weight:600;color:#333;width:90px">報價單價</th>
+      <th style="padding:5px 6px;text-align:right;font-weight:600;color:#333;width:90px">費用</th>
+      <th style="padding:5px 6px;text-align:left;font-weight:600;color:#333">備註</th>
     </tr>`;
 
     // 第一頁：標題 + 前幾個大項；後續頁：只有頁頭+大項
     // 策略：每個大項一個 page，第一頁加大標題
+    // 所有大項放同一頁，讓瀏覽器自然分頁，避免每項後面大片空白
+    let workBody = `<div style="text-align:center;font-size:17px;font-weight:700;letter-spacing:.5em;margin-bottom:16px">工 程 明 細</div>`;
     cats.forEach((cat, ci) => {
       const catItemsList = items.filter(i => i.category_id === cat.id);
       let rows = '';
@@ -797,16 +801,12 @@ function openPrintWindow(project, data, sections, paymentMode) {
             <td style="padding:5px 6px;text-align:center;border-bottom:1px solid #EBEBEA">${item.quantity}</td>
             <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${item.unit_price ? (+item.unit_price).toLocaleString() : '-'}</td>
             <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${item.unit_price ? Math.round(item.unit_price * item.quantity).toLocaleString() : '-'}</td>
-            <td style="padding:5px 6px;font-size:10px;color:#666;border-bottom:1px solid #EBEBEA">${esc(item.notes)}</td>
+            <td style="padding:5px 6px;font-size:10px;color:#666;border-bottom:1px solid #EBEBEA;white-space:nowrap">${esc(item.notes)}</td>
           </tr>`;
         }
       });
-      const isFirst = ci === 0;
-      const isLast = ci === cats.length - 1;
-      body += `<div class="page" style="min-height:auto;padding-bottom:8mm">
-        ${workPageHeader}
-        ${isFirst ? `<div style="text-align:center;font-size:17px;font-weight:700;letter-spacing:.5em;margin-bottom:16px">工 程 明 細</div>` : ''}
-        <div style="margin-bottom:20px">
+      workBody += `
+        <div style="margin-bottom:20px;page-break-inside:avoid">
           <div style="border-left:3px solid #333;padding-left:8px;margin-bottom:6px">
             <span style="font-size:13px;font-weight:700">${String.fromCharCode(65 + ci)}.  ${esc(cat.name)}</span>
           </div>
@@ -821,10 +821,13 @@ function openPrintWindow(project, data, sections, paymentMode) {
               </tr>
             </tfoot>
           </table>
-        </div>
-        <div class="footer" style="${isLast ? '' : 'margin-top:auto'}">${footerContent}</div>
-      </div>`;
+        </div>`;
     });
+    body += `<div class="page" style="min-height:auto">
+      ${workPageHeader}
+      ${workBody}
+      <div class="footer">${footerContent}</div>
+    </div>`;
   }
 
   // ── Purchase Pages ──
@@ -953,8 +956,99 @@ function openPrintWindow(project, data, sections, paymentMode) {
     const stageRows = ps.map(function (s) {
       return '<tr style="border-bottom:1px solid #EBEBEA">' + '<td style="padding:6px 10px;font-weight:' + (s.is_current ? '700' : '400') + '">' + (s.is_current ? '<span style="color:#8B2E2E">[本期]</span> ' : '') + esc(s.name) + '</td>' + '<td style="padding:6px 10px;text-align:right">' + fmtN(s.amount || 0) + '</td>' + '<td style="padding:6px 10px;text-align:right;color:' + ((s.paid_amount || 0) > 0 ? '#3A5240' : '#888') + '">' + ((s.paid_amount || 0) > 0 ? fmtN(s.paid_amount) : '–') + '</td>' + '<td style="padding:6px 10px;text-align:center;color:#666">' + (s.paid_date || '–') + '</td>' + '<td style="padding:6px 10px;text-align:center;color:' + stageStatusColor(s) + ';font-weight:500">' + stageStatusLabel(s) + '</td>' + '</tr>';
     }).join('');
-    const openDate = project.project_date ? project.project_date.replace(/-/g, '/') : '（未填寫日期）';
-    body += '<div class="page">' + '<div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:0.3em;margin-bottom:18px">工程請款單</div>' + '<div style="border-bottom:1.5px solid #333;margin-bottom:16px"></div>' + '<table style="width:100%;font-size:11.5px;margin-bottom:16px"><tr>' + '<td style="padding:4px 0;width:50%"><strong>工程名稱：</strong>' + esc(project.name) + '</td>' + '<td style="padding:4px 0"><strong>開單日期：</strong>' + openDate + '</td>' + '</tr><tr>' + '<td style="padding:4px 0"><strong>聯 絡 人：</strong>' + esc(project.contact_person || '') + '</td>' + '<td style="padding:4px 0"><strong>聯絡電話：</strong>' + esc(project.contact_phone || '') + '</td>' + '</tr></table>' + '<div class="section-title" style="margin-bottom:8px">各期付款明細總表</div>' + '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">' + '<thead><tr style="background:#F2F2F0;border-bottom:1.5px solid #666">' + '<th style="padding:6px 10px;text-align:left">階段名稱</th>' + '<th style="padding:6px 10px;text-align:right">應收金額</th>' + '<th style="padding:6px 10px;text-align:right">已付金額</th>' + '<th style="padding:6px 10px;text-align:center">付款日期</th>' + '<th style="padding:6px 10px;text-align:center">結算狀態</th>' + '</tr></thead>' + '<tbody>' + stageRows + '</tbody>' + '<tfoot><tr style="background:#F5F5F5;border-top:1.5px solid #666;font-weight:700">' + '<td style="padding:7px 10px;text-align:right">總計</td>' + '<td style="padding:7px 10px;text-align:right">' + fmtN(totalAmount) + '</td>' + '<td style="padding:7px 10px;text-align:right;color:#3A5240">' + fmtN(totalPaid) + '</td>' + '<td colspan="2" style="padding:7px 10px;text-align:center;color:#8B2E2E">未收尾款：' + fmtN(unpaid) + '</td>' + '</tr></tfoot>' + '</table>' + (currentStage ? '<div style="border:1.5px dashed #AAA;border-radius:6px;padding:16px 20px;margin-bottom:16px">' + '<div style="font-size:11px;color:#666;margin-bottom:6px">總專案金額：' + fmtN(totalAmount) + '</div>' + '<div style="font-size:13px;font-weight:700;margin-bottom:12px">本期請款項目：' + esc(currentStage.name) + '</div>' + '<div style="font-size:11px;margin-bottom:12px;border-bottom:1px dashed #CCC;padding-bottom:10px">' + '本期表定金額：' + fmtN(currentAmt) + (prevUnpaid > 0 ? '　　<span style="color:#6B4835">前期未結餘額：+' + fmtN(prevUnpaid) + '</span>' : '') + '</div>' + '<div style="text-align:center;font-size:17px;font-weight:700;color:#8B2E2E;letter-spacing:0.05em">本期總計應匯款：' + fmtN(totalDue) + '</div>' + '</div>' : '') + bankHTML + '<div style="flex:1"></div>' + '<div style="display:flex;justify-content:flex-end;margin-bottom:16px">' + '<div style="border:1px dashed #AAA;border-radius:4px;width:220px;height:80px;padding:8px 12px;display:flex;flex-direction:column;justify-content:space-between">' + '<span style="font-size:10px;color:#666">業主簽收確認</span>' + '<span style="font-size:9px;color:#BBB;align-self:flex-end">日期：____________</span>' + '</div>' + '</div>' + '<div style="padding-top:12px;border-top:1px solid #DDD;text-align:center;font-size:9px;color:#999">' + footerContent + '</div>' + '</div>';
+    const invoiceNo2 = project.invoice_prefix ? (project.invoice_prefix + '-' + (project.invoice_seq || '001')) : (new Date().toISOString().slice(2,10).replace(/-/g,'') + '-' + Math.floor(Math.random()*900+100));
+    const dateStr2 = new Date().toLocaleDateString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\//g,'/');
+    const paymentBlock2 = paymentBlock; // 與工程報價單共用相同付款資訊
+
+    body += `<div class="page" style="padding:14mm 16mm;font-family:'Noto Sans TC',sans-serif">
+
+      <!-- Logo -->
+      <div style="margin-bottom:32px">${logoBlock}</div>
+
+      <!-- FROM / BILLED TO / Invoice / Payment -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px">
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:8px">FROM</div>
+          <div style="font-size:13px;line-height:2;color:#1A1A18;margin-bottom:20px">
+            <div style="font-weight:700">無澀空間 ARTRIUM</div>
+            <div>台北市內湖區陽光街321巷18號4樓</div>
+            <div>M / 0910119114</div>
+            <div>E / Dexigner13@gmail.com</div>
+          </div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:6px">Invoice</div>
+          <div style="font-size:12px;color:#555;margin-bottom:14px"># ${invoiceNo2}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:6px">Date</div>
+          <div style="font-size:12px;color:#555">${dateStr2}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:8px">BILLED TO</div>
+          <div style="font-size:13px;line-height:2;color:#1A1A18;margin-bottom:20px">
+            <div style="font-weight:700">${esc(project.client_name || project.contact_person || '—')}</div>
+            ${project.contact_person ? `<div>${esc(project.contact_person)}</div>` : ''}
+            ${project.address ? `<div>${esc(project.address)}</div>` : ''}
+          </div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:8px">Payment Items</div>
+          <div style="font-size:12px;color:#555;line-height:2.2">${paymentBlock2 || '<div style="color:#CCC">—</div>'}</div>
+        </div>
+      </div>
+
+      <!-- 分隔線 -->
+      <div style="border-top:1.5px solid #1A1A18;margin-bottom:0"></div>
+
+      <!-- 請款明細表 -->
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:0">
+        <thead>
+          <tr style="border-bottom:1px solid #999">
+            <th style="padding:10px 0;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em">階段名稱</th>
+            <th style="padding:10px 0;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em;width:120px">應收金額</th>
+            <th style="padding:10px 0;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em;width:120px">已付金額</th>
+            <th style="padding:10px 0;text-align:center;font-size:11px;font-weight:700;letter-spacing:.06em;width:100px">付款日期</th>
+            <th style="padding:10px 0;text-align:center;font-size:11px;font-weight:700;letter-spacing:.06em;width:80px">狀態</th>
+          </tr>
+        </thead>
+        <tbody>${stageRows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="padding:0;border-top:1px solid #DDD"></td>
+            <td colspan="2" style="padding:0;border-top:1px solid #DDD"></td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:8px 0;font-size:12px;color:#888;text-align:right">Sub Total</td>
+            <td style="padding:8px 0;font-size:12px;text-align:right">$ ${fmtN(totalAmount)}</td>
+            <td colspan="2"></td>
+          </tr>
+          <tr style="border-top:1.5px solid #1A1A18">
+            <td colspan="2" style="padding:10px 0;font-size:13px;font-weight:700;text-align:right">Total</td>
+            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">$ ${fmtN(totalAmount)}</td>
+            <td colspan="2" style="padding:10px 0;font-size:11px;color:#8B2E2E;text-align:center">未收：$ ${fmtN(unpaid)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      ${currentStage ? `
+      <!-- 本期請款框 -->
+      <div style="border:1.5px solid #2E4D5C;border-radius:6px;padding:16px 20px;margin-top:24px">
+        <div style="font-size:11px;color:#666;margin-bottom:6px">本期請款項目：${esc(currentStage.name)}</div>
+        <div style="font-size:12px;margin-bottom:4px">本期表定金額：$ ${fmtN(currentAmt)}</div>
+        ${prevUnpaid > 0 ? `<div style="font-size:12px;color:#8B2E2E;margin-bottom:4px">前期未結餘額：+ $ ${fmtN(prevUnpaid)}</div>` : ''}
+        <div style="font-size:18px;font-weight:800;color:#8B2E2E;margin-top:8px;text-align:right">本期總計應匯款：$ ${fmtN(totalDue)}</div>
+      </div>` : ''}
+
+      <!-- 簽收 -->
+      <div style="display:flex;justify-content:space-between;margin-top:32px;padding-top:16px">
+        <div>
+          <div style="font-size:11px;font-weight:700;margin-bottom:20px">Accepted by</div>
+          <div style="border-bottom:1px solid #333;width:160px"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;margin-bottom:20px">Signature</div>
+          <div style="border-bottom:1px solid #333;width:160px"></div>
+        </div>
+      </div>
+
+      <!-- 頁尾 -->
+      <div class="footer">${footerContent}</div>
+    </div>`;
   }
   const html = `<!DOCTYPE html><html lang="zh-TW"><head>
     <meta charset="UTF-8">
