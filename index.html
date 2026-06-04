@@ -1445,7 +1445,7 @@ function ProjectListPage({
         data: memberships
       } = await db.from('project_members').select('project_id').eq('user_id', user.id);
       const grantedIds = new Set((memberships || []).map(m => m.project_id));
-      visible = visible.filter(proj => proj.created_by === user.username || grantedIds.has(proj.id));
+      visible = visible.filter(proj => grantedIds.has(proj.id) || proj.created_by === user.username || !proj.created_by);
     }
     setProjects(visible);
     setTodos(t || []);
@@ -1466,30 +1466,33 @@ function ProjectListPage({
     const workCats = workCatsRaw.split('\n').map(s => s.trim()).filter(Boolean);
     const purchaseCats = purchaseCatsRaw.split('\n').map(s => s.trim()).filter(Boolean);
     const {
-      data
+      data, error
     } = await db.from('projects').insert({
       name: newName,
       client_name: newClient,
-      notes: sObj['default_notes'] || '',
-      created_by: user.username
+      notes: sObj['default_notes'] || ''
     }).select().single();
+    if (error) {
+      toast('建立失敗：' + (error.message || JSON.stringify(error)), 'error');
+      return;
+    }
     if (data) {
-      await db.from('work_categories').insert(workCats.map((name, i) => ({
-        project_id: data.id,
-        name,
-        sort_order: i
-      })));
-      if (purchaseCats.length) await db.from('purchase_categories').insert(purchaseCats.map((name, i) => ({
-        project_id: data.id,
-        name,
-        sort_order: i
-      })));
+      for (const item of workCats.map((name, i) => ({ project_id: data.id, name, sort_order: i }))) {
+        await db.from('work_categories').insert(item);
+      }
+      if (purchaseCats.length) {
+        for (const item of purchaseCats.map((name, i) => ({ project_id: data.id, name, sort_order: i }))) {
+          await db.from('purchase_categories').insert(item);
+        }
+      }
       toast('專案已建立');
       setShowNew(false);
       setNewName('');
       setNewClient('');
       setNewAddress('');
       load();
+    } else {
+      toast('建立失敗：未收到回應，請重試', 'error');
     }
   };
   const updateStatus = async (id, status) => {
@@ -1711,8 +1714,7 @@ function ProjectListPage({
         notes: importPreview.notes,
         status: importStatus,
         is_locked: false,
-        created_by: user.username
-      }).select().single();
+        }).select().single();
 
       // Import work items
       const catMap = {};
