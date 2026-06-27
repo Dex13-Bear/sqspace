@@ -934,13 +934,13 @@ function openPrintWindow(project, data, sections, paymentMode) {
   // ── Payment Page ──
   if (sections.payment) { // 有勾選就列印，paymentStages 可為空
     const ps = data.paymentStages;
-    const currentStage = ps.find(s => s.is_current) || ps[ps.length - 1];
+    const currentStages = ps.filter(s => s.is_current); // 支援多選
     const totalAmount = ps.reduce((s, st) => s + (st.amount || 0), 0);
     const totalPaid = ps.reduce((s, st) => s + (st.paid_amount || 0), 0);
     const unpaid = totalAmount - totalPaid;
-    const prevUnpaid = ps.filter(s => s.id !== (currentStage && currentStage.id)).reduce((s, st) => s + Math.max(0, (st.amount || 0) - (st.paid_amount || 0)), 0);
-    const currentAmt = currentStage ? currentStage.amount || 0 : 0;
-    const totalDue = currentAmt + prevUnpaid;
+    // 本期總計 = 勾選期的（應收 - 已付）加總
+    const totalDue = currentStages.reduce((acc, s) => acc + Math.max(0, (s.amount || 0) - (s.paid_amount || 0)), 0);
+    const currentStage = currentStages[0] || null; // 向後相容
     const stageStatusLabel = function (s) {
       if (!s.amount) return '未設定';
       if ((s.paid_amount || 0) >= s.amount) return '已結清';
@@ -954,7 +954,7 @@ function openPrintWindow(project, data, sections, paymentMode) {
       return '#888';
     };
     const stageRows = ps.map(function (s) {
-      return '<tr style="border-bottom:1px solid #EBEBEA">' + '<td style="padding:6px 10px;font-weight:' + (s.is_current ? '700' : '400') + '">' + (s.is_current ? '<span style="color:#8B2E2E">[本期]</span> ' : '') + esc(s.name) + '</td>' + '<td style="padding:6px 10px;text-align:right">' + fmtN(s.amount || 0) + '</td>' + '<td style="padding:6px 10px;text-align:right;color:' + ((s.paid_amount || 0) > 0 ? '#3A5240' : '#888') + '">' + ((s.paid_amount || 0) > 0 ? fmtN(s.paid_amount) : '–') + '</td>' + '<td style="padding:6px 10px;text-align:center;color:#666">' + (s.paid_date || '–') + '</td>' + '<td style="padding:6px 10px;text-align:center;color:' + stageStatusColor(s) + ';font-weight:500">' + stageStatusLabel(s) + '</td>' + '</tr>';
+      return '<tr style="border-bottom:1px solid #EBEBEA">' + '<td style="padding:6px 10px;font-weight:' + (s.is_current ? '700' : '400') + '">' + (s.is_current ? '<span style="color:#8B2E2E">[本期請領]</span> ' : '') + esc(s.name) + '</td>' + '<td style="padding:6px 10px;text-align:right">' + fmtN(s.amount || 0) + '</td>' + '<td style="padding:6px 10px;text-align:right;color:' + ((s.paid_amount || 0) > 0 ? '#3A5240' : '#888') + '">' + ((s.paid_amount || 0) > 0 ? fmtN(s.paid_amount) : '–') + '</td>' + '<td style="padding:6px 10px;text-align:center;color:#666">' + (s.paid_date || '–') + '</td>' + '<td style="padding:6px 10px;text-align:center;color:' + stageStatusColor(s) + ';font-weight:500">' + stageStatusLabel(s) + '</td>' + '</tr>';
     }).join('');
     const invoiceNo2 = project.invoice_prefix ? (project.invoice_prefix + '-' + (project.invoice_seq || '001')) : (new Date().toISOString().slice(2,10).replace(/-/g,'') + '-' + Math.floor(Math.random()*900+100));
     const dateStr2 = new Date().toLocaleDateString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\//g,'/');
@@ -1014,24 +1014,23 @@ function openPrintWindow(project, data, sections, paymentMode) {
           </tr>
           <tr>
             <td colspan="2" style="padding:8px 0;font-size:12px;color:#888;text-align:right">Sub Total</td>
-            <td style="padding:8px 0;font-size:12px;text-align:right">$ ${fmtN(totalAmount)}</td>
+            <td style="padding:8px 0;font-size:12px;text-align:right">${fmtN(totalAmount)}</td>
             <td colspan="2"></td>
           </tr>
           <tr style="border-top:1.5px solid #1A1A18">
             <td colspan="2" style="padding:10px 0;font-size:13px;font-weight:700;text-align:right">Total</td>
-            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">$ ${fmtN(totalAmount)}</td>
-            <td colspan="2" style="padding:10px 0;font-size:11px;color:#8B2E2E;text-align:center">未收：$ ${fmtN(unpaid)}</td>
+            <td style="padding:10px 0;font-size:15px;font-weight:700;text-align:right;white-space:nowrap">${fmtN(totalAmount)}</td>
+            <td colspan="2" style="padding:10px 0;font-size:11px;color:#8B2E2E;text-align:center">尚未請款金額：${fmtN(unpaid)}</td>
           </tr>
         </tfoot>
       </table>
 
-      ${currentStage ? `
+      ${currentStages.length > 0 ? `
       <!-- 本期請款框 -->
       <div style="border:1.5px solid #2E4D5C;border-radius:6px;padding:16px 20px;margin-top:24px">
-        <div style="font-size:11px;color:#666;margin-bottom:6px">本期請款項目：${esc(currentStage.name)}</div>
-        <div style="font-size:12px;margin-bottom:4px">本期表定金額：$ ${fmtN(currentAmt)}</div>
-        ${prevUnpaid > 0 ? `<div style="font-size:12px;color:#8B2E2E;margin-bottom:4px">前期未結餘額：+ $ ${fmtN(prevUnpaid)}</div>` : ''}
-        <div style="font-size:18px;font-weight:800;color:#8B2E2E;margin-top:8px;text-align:right">本期總計應匯款：$ ${fmtN(totalDue)}</div>
+        <div style="font-size:11px;color:#666;margin-bottom:8px">本期請款項目：${currentStages.map(s => esc(s.name)).join('、')}</div>
+        ${currentStages.map(s => `<div style="font-size:12px;margin-bottom:3px">${esc(s.name)}：${fmtN(s.amount)}</div>`).join('')}
+        <div style="font-size:18px;font-weight:800;color:#8B2E2E;margin-top:10px;text-align:right">本期總計應匯款：${fmtN(totalDue)}</div>
       </div>` : ''}
 
       <!-- 簽收 -->
@@ -1096,7 +1095,8 @@ function openPrintWindow(project, data, sections, paymentMode) {
 function PrintModal({
   open,
   onClose,
-  project
+  project,
+  livePaymentStages
 }) {
   const [sections, setSections] = useState({
     summary: true,
@@ -1137,8 +1137,11 @@ function PrintModal({
   }));
   const doPrint = () => {
     if (!data) return;
-    if (sections.payment) toast('請款階段筆數：' + (data.paymentStages || []).length);
-    openPrintWindow(project, data, sections, paymentMode);
+    // 用即時的 stages state 覆蓋資料庫讀回的 paymentStages（確保 is_current 是最新的）
+    const mergedData = livePaymentStages && livePaymentStages.length > 0
+      ? { ...data, paymentStages: livePaymentStages }
+      : data;
+    openPrintWindow(project, mergedData, sections, paymentMode);
     onClose();
   };
   if (!open) return null;
@@ -9343,15 +9346,25 @@ function SettlementTab({
 function StagePctInput({ stageId, defaultPct, isLast, onSave }) {
   const [editing, setEditing] = React.useState(false);
   const [local, setLocal] = React.useState(String(defaultPct));
+  const prevPct = React.useRef(defaultPct);
+
+  // 當外部 defaultPct 變化時（金額被重新計算），同步更新顯示
+  React.useEffect(() => {
+    if (!editing && prevPct.current !== defaultPct) {
+      setLocal(String(defaultPct));
+      prevPct.current = defaultPct;
+    }
+  }, [defaultPct, editing]);
 
   const handleBlur = () => {
     setEditing(false);
     const pct = Math.min(100, Math.max(0, parseFloat(local) || 0));
     setLocal(String(pct));
+    prevPct.current = pct;
     onSave(pct);
   };
 
-  if (isLast) return React.createElement('span', { style: { color: '#AAA', fontSize: 12 } }, local + '%');
+  if (isLast) return React.createElement('span', { style: { color: '#AAA', fontSize: 12 } }, defaultPct + '%');
 
   if (editing) return React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
     React.createElement('input', {
@@ -9372,18 +9385,18 @@ function StagePctInput({ stageId, defaultPct, isLast, onSave }) {
 }
 
 function StageAmountInput({ stageId, value, onSave, color, suffix }) {
+  const [editing, setEditing] = React.useState(false);
   const [local, setLocal] = React.useState(String(value ?? 0));
-  const prevStageId = React.useRef(stageId);
 
-  // 只有當 stageId 換了（切換到不同行）才從外部同步值，避免輸入中被覆蓋
+  // 非編輯狀態時永遠跟外部 value 同步（比例改變後金額會更新）
   React.useEffect(() => {
-    if (prevStageId.current !== stageId) {
+    if (!editing) {
       setLocal(String(value ?? 0));
-      prevStageId.current = stageId;
     }
-  }, [stageId, value]);
+  }, [value, editing]);
 
   const handleBlur = () => {
+    setEditing(false);
     const num = parseFloat(local) || 0;
     setLocal(String(num));
     if (num !== value) onSave(num);
@@ -9408,14 +9421,15 @@ function StageAmountInput({ stageId, value, onSave, color, suffix }) {
       onChange: e => setLocal(e.target.value),
       onBlur: handleBlur,
       onKeyDown: e => { if (e.key === 'Enter') e.target.blur(); },
-      onFocus: e => { e.target.style.background = '#fff'; e.target.style.border = '1px solid #888'; },
+      onFocus: e => { setEditing(true); e.target.style.background = '#fff'; e.target.style.border = '1px solid #888'; },
     }),
     suffix ? React.createElement('span', { style: { fontSize: 12, color: '#888', marginLeft: 1 } }, suffix) : null
   );
 }
 
 function PaymentTab({
-  project
+  project,
+  onStagesChange
 }) {
   const [stages, setStages] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
@@ -9557,6 +9571,7 @@ function PaymentTab({
     }
     await db.from('payment_stages').update({ [field]: val }).eq('id', id);
     setStages(newStages);
+    if (onStagesChange) onStagesChange(newStages);
   };
 
   const recalcAll = async () => {
@@ -9644,10 +9659,13 @@ function PaymentTab({
               const isLast = idx === LAST_IDX;
               return React.createElement('tr', { key: s.id, style: s.is_current ? { background: '#F0F4F0' } : {} },
                 React.createElement('td', { style: { textAlign: 'center' } },
-                  React.createElement('input', { type: 'radio', checked: !!s.is_current,
+                  React.createElement('input', { type: 'checkbox', checked: !!s.is_current,
                     onChange: () => {
-                      stages.forEach(st => db.from('payment_stages').update({ is_current: st.id === s.id }).eq('id', st.id));
-                      setStages(prev => prev.map(st => ({ ...st, is_current: st.id === s.id })));
+                      const newVal = !s.is_current;
+                      db.from('payment_stages').update({ is_current: newVal }).eq('id', s.id);
+                      const updated = stages.map(st => st.id === s.id ? { ...st, is_current: newVal } : st);
+                      setStages(updated);
+                      if (onStagesChange) onStagesChange(updated);
                     }
                   })
                 ),
@@ -9657,7 +9675,7 @@ function PaymentTab({
                 React.createElement('td', { className: 'num' },
                   React.createElement(StagePctInput, {
                     stageId: s.id,
-                    defaultPct: DEFAULT_STAGES[idx]?.percentage || 0,
+                    defaultPct: grandTotal > 0 && s.amount ? Math.round((s.amount || 0) / grandTotal * 1000) / 10 : (DEFAULT_STAGES[idx]?.percentage || 0),
                     isLast: isLast,
                     onSave: pct => {
                       const amt = Math.round(grandTotal * pct / 100);
@@ -9730,7 +9748,7 @@ function PaymentTab({
           ),
           React.createElement('tbody', null,
             stages.map(s => React.createElement('tr', { key: s.id, style: s.is_current ? { background: '#EDF0EC' } : {} },
-              React.createElement('td', null, s.is_current ? React.createElement('strong', null, '【本期】', s.name) : s.name),
+              React.createElement('td', null, s.is_current ? React.createElement('strong', null, '【本期請領】', s.name) : s.name),
               React.createElement('td', { className: 'num' }, fmt(s.amount)),
               React.createElement('td', { className: 'num', style: { color: (s.paid_amount || 0) > 0 ? '#3A5240' : '#888' } }, s.paid_amount ? fmt(s.paid_amount) : '-'),
               React.createElement('td', null, fmtDate(s.paid_date)),
@@ -9749,17 +9767,305 @@ function PaymentTab({
         )
       ),
       (() => {
-        const currentStage = stages.find(s => s.is_current);
-        if (!currentStage) return null;
-        const prevUnpaid = stages.filter(s => !s.is_current && (s.paid_amount || 0) < s.amount).reduce((acc, s) => acc + (s.amount - (s.paid_amount || 0)), 0);
-        const thisTotal = (currentStage.amount || 0) + prevUnpaid;
+        const currentStages = stages.filter(s => s.is_current);
+        if (currentStages.length === 0) return null;
+        // 本期總計 = 所有勾選期的應收金額（扣除已付）
+        const thisTotal = currentStages.reduce((acc, s) => acc + Math.max(0, (s.amount || 0) - (s.paid_amount || 0)), 0);
+        const names = currentStages.map(s => s.name).join('、');
         return React.createElement('div', { style: { border: '2px solid #2E4D5C', borderRadius: 8, padding: '16px 20px', marginTop: 16 } },
-          React.createElement('div', { style: { fontSize: 13, marginBottom: 6 } }, '本期請款項目：', currentStage.name),
-          React.createElement('div', { style: { fontSize: 13 } }, '本期表定金額：', fmt(currentStage.amount)),
-          prevUnpaid > 0 && React.createElement('div', { style: { fontSize: 13, color: '#8B2E2E' } }, '前期未結餘額：+', fmt(prevUnpaid)),
-          React.createElement('div', { style: { fontSize: 20, fontWeight: 800, color: '#8B2E2E', marginTop: 8 } }, '本期總計應匯款：', fmt(thisTotal))
+          React.createElement('div', { style: { fontSize: 13, marginBottom: 6 } }, '本期請款項目：', names),
+          currentStages.map(s => React.createElement('div', { key: s.id, style: { fontSize: 13, marginBottom: 2 } },
+            s.name, '：', fmt(s.amount),
+            (s.paid_amount || 0) > 0 ? React.createElement('span', { style: { color: '#3A5240', marginLeft: 8 } }, '（已付 ', fmt(s.paid_amount), '）') : null
+          )),
+          React.createElement('div', { style: { fontSize: 20, fontWeight: 800, color: '#8B2E2E', marginTop: 12 } }, '本期總計應匯款：', fmt(thisTotal))
         );
       })()
+    )
+  );
+}
+
+
+function ContractTab({ project }) {
+  const [contractData, setContractData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      // 讀取 payment_stages 以填入付款資訊
+      const [stagesRes, wiRes] = await Promise.all([
+        db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order'),
+        db.from('work_items').select('*').eq('project_id', project.id),
+      ]);
+      const stages = stagesRes.data || [];
+      const wi = wiRes.data || [];
+      const wTotal = wi.reduce((s, i) => s + (i.unit_price||0)*(i.quantity||0), 0);
+      const mFee = wTotal * ((project.management_fee_rate||7)/100);
+      const grandTotal = wTotal + mFee;
+      setContractData({ stages, grandTotal });
+      setLoading(false);
+    })();
+  }, [project.id]);
+
+  const printContract = () => {
+    const w = window.open('', '_blank', 'width=900,height=1200');
+    const logoSrc = window._largeLogo || '';
+    const logoHtml = logoSrc
+      ? `<img src="${logoSrc}" style="height:60px;object-fit:contain">`
+      : `<div style="font-size:22px;font-weight:700;letter-spacing:.2em">無澀空間 ARTRIUM</div>`;
+
+    const today = new Date();
+    const yr = today.getFullYear() - 1911;
+    const mo = today.getMonth() + 1;
+    const dy = today.getDate();
+
+    const totalNTD = contractData ? Math.round(contractData.grandTotal) : 0;
+    const stageRows = contractData ? contractData.stages.map((s, i) => {
+      const pct = contractData.grandTotal > 0 ? Math.round(s.amount / contractData.grandTotal * 1000) / 10 : 0;
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #DDD">第${['一','二','三','四','五'][i] || (i+1)}期款</td>
+        <td style="padding:6px 10px;border:1px solid #DDD">${s.name}</td>
+        <td style="padding:6px 10px;border:1px solid #DDD;text-align:right">NT$${s.amount.toLocaleString()}</td>
+        <td style="padding:6px 10px;border:1px solid #DDD;text-align:center">${pct}%</td>
+      </tr>`;
+    }).join('') : '';
+
+    w.document.write(`<!DOCTYPE html><html><head>
+      <meta charset="utf-8">
+      <title>設計裝修合約 - ${project.name}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Noto Sans TC',sans-serif;font-size:12px;color:#111;background:#fff;padding:16mm 18mm;line-height:1.9}
+        h1{font-size:18px;font-weight:700;text-align:center;letter-spacing:.3em;margin:24px 0 32px}
+        .header{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;margin-bottom:24px;border-bottom:2px solid #111}
+        .parties{margin-bottom:24px;padding:16px;background:#F8F8F6;border-radius:4px;font-size:12px}
+        .clause{margin-bottom:18px;page-break-inside:avoid}
+        .clause-title{font-weight:700;margin-bottom:4px}
+        .clause-body{padding-left:1em}
+        .sub{padding-left:1.5em;margin-bottom:2px}
+        table{width:100%;border-collapse:collapse;margin:8px 0}
+        .sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:24px;border-top:1px solid #CCC}
+        .sign-block{font-size:12px;line-height:2.4}
+        .sign-line{border-bottom:1px solid #555;margin-top:8px;height:28px}
+        @media print{body{padding:12mm 14mm}@page{margin:0}}
+      </style>
+    </head><body>
+      <div class="header">
+        ${logoHtml}
+        <div style="text-align:right;font-size:10px;color:#888">無澀空間室內裝修股份有限公司</div>
+      </div>
+
+      <h1>設 計 裝 修 合 約 書</h1>
+
+      <div class="parties">
+        <div><strong>立合約書人：</strong></div>
+        <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div><strong>甲方（業主）：</strong>${project.client_name || '　　　　　　　　　　'}</div>
+            <div>地址：${project.address || '　　　　　　　　　　　　　　'}</div>
+            <div>電話：${project.contact_phone || '　　　　　　　　　　'}</div>
+          </div>
+          <div>
+            <div><strong>乙方（承攬人）：</strong>鄭凱群</div>
+            <div>公司：無澀空間室內裝修股份有限公司</div>
+            <div>統編：90535151</div>
+            <div>地址：台北市內湖區陽光街321巷18號4樓</div>
+            <div>電話：0910-119-114</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:#555">雙方就甲方委託乙方承攬室內設計裝修事宜，合意簽訂本合約如下條款，並共同遵守：</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">一、工程名稱</div>
+        <div class="clause-body">${project.name || '　　　　　　　　　　'}室內設計裝潢工程</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">二、工程地點</div>
+        <div class="clause-body">${project.address || '　　　　　　　　　　　　　　　　　　　　'}</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">三、工程範圍</div>
+        <div class="clause-body">
+          <div>依甲方簽認之估價單與設計圖說內容執行（作為本合約附件），依列項目與進度施作。</div>
+          <div>若因甲方要求變更設計，乙方已完成之工程或已調度之人力、材料，應依本合約單價另議補償。</div>
+        </div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">四、設計費與工程總價</div>
+        <div class="clause-body">
+          <div class="sub">1. 設計費：依雙方另議，隨報價單載明。</div>
+          <div class="sub">2. 工程總價：新台幣 <strong>NT$${totalNTD.toLocaleString()}</strong>，不含營業稅 5%。</div>
+          <div class="sub">3. 本工程完工並驗收後，應依實際總額進行結算。如甲方有設計變更需求，變更部分之費用應另行議定計價。</div>
+        </div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">五、工程期限</div>
+        <div class="clause-body">
+          <div class="sub">1. 工期預估：　　　日曆天完成</div>
+          <div class="sub">2. 開工日期：中華民國　　　年　　　月　　　日</div>
+          <div class="sub">3. 完工日期：中華民國　　　年　　　月　　　日</div>
+          <div class="sub">4. 如因追加工程或設計變更，甲方應同意合理順延工期，相關日期由雙方另議。</div>
+          <div class="sub">5. 遇不可抗力事件或非乙方可歸責因素致進度延誤者，經雙方現場會勘確認後，得延長工期。</div>
+          <div class="sub">6. 延遲罰緩：以總價 10% 為上限；前 7 日每日 0.1%，第 8 日起每日 0.2%，最高不超過 10%。</div>
+          <div class="sub">7. 驗收基準：依圖說與估價單，不影響一般使用為原則，乙方應於合理期限內改善。</div>
+        </div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">六、工程圖說</div>
+        <div class="clause-body">乙方提供設計圖說經甲方簽認後，視為合約一部分。如需修改，乙方應配合辦理。</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">七、工程增減變更</div>
+        <div class="clause-body">非附件所列項目，須由雙方簽認書面變更單或通訊軟體之確認，方可施工並納入結算。乙方不得擅自增減項目，如甲方需追加，應另簽變更單並議定費用後方可施作。</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">八、所有權歸屬</div>
+        <div class="clause-body">甲方結清工程與追加費用前，裝修物件所有權屬乙方。已驗收並交付部分不在此限。</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">九、先行使用與保管</div>
+        <div class="clause-body">工程未全面驗收前，甲方如需提前使用特定區域，應先行驗收該區域並支付該部分對應款項，保固期亦從該區域驗收日起算。</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">十、保固期限</div>
+        <div class="clause-body">
+          <div>驗收日起一年內，若因施工或材料瑕疵致損壞，乙方應免費修復。下列情形不適用本保固：</div>
+          <div class="sub">・不可抗力（地震、颱風等天然災害）</div>
+          <div class="sub">・甲方或第三人不當使用、擅自改動</div>
+          <div class="sub">・正常使用耗損（燈泡更換、表面刮損等）</div>
+        </div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">十一、契約生效與違約罰責</div>
+        <div class="clause-body">
+          <div class="sub">1. 本合約自雙方簽署之日起生效，並具有同等法律效力。</div>
+          <div class="sub">2. 甲方無故未啟動施工或片面終止本契約，視為違約，應賠償乙方相當於本工程總價 15% 之設計及規劃準備費用。</div>
+          <div class="sub">3. 乙方無故停工超過 14 日曆天，甲方得終止合約並要求乙方賠償已付款項中超出完成比例之部分。</div>
+        </div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">十二、付款方式與進度</div>
+        <div class="clause-body">
+          ${stageRows ? `<table>
+            <thead><tr style="background:#F2F2F0">
+              <th style="padding:6px 10px;border:1px solid #DDD;text-align:left">期別</th>
+              <th style="padding:6px 10px;border:1px solid #DDD;text-align:left">付款時機</th>
+              <th style="padding:6px 10px;border:1px solid #DDD;text-align:right">金額</th>
+              <th style="padding:6px 10px;border:1px solid #DDD;text-align:center">比例</th>
+            </tr></thead>
+            <tbody>${stageRows}</tbody>
+          </table>` : '<div style="color:#CCC">（請先在請款單分頁設定各期金額）</div>'}
+          <div style="margin-top:10px"><strong>匯款資訊：</strong></div>
+          <div class="sub">銀行：台北富邦 營業部（代碼 012）</div>
+          <div class="sub">戶名：鄭凱群　　帳號：816-8000-8713711</div>
+          <div class="sub">（或公司戶：無澀空間室內裝修股份有限公司　統編：90535151）</div>
+        </div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">十三、保固條件說明</div>
+        <div class="clause-body">驗收日起一年，請妥善保存合約及估價單以憑後續申請保固服務。</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">十四、智慧財產權</div>
+        <div class="clause-body">乙方所提供之設計圖說、3D 示意圖及相關設計成果，其著作財產權歸屬乙方。未經乙方書面同意，甲方不得將上述成果轉讓、出售或授權他人使用。</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">十五、隱私與保密</div>
+        <div class="clause-body">雙方對本合約內容及施工過程中涉及之財務資訊，應予保密，未經對方書面同意不得對外揭露。</div>
+      </div>
+
+      <div class="clause" style="page-break-inside:avoid">
+        <div class="clause-title">十六、管轄法院</div>
+        <div class="clause-body">因本合約所生之爭議，以台灣台北地方法院為第一審管轄法院。</div>
+      </div>
+
+      <div style="margin-top:24px;font-size:11px;color:#555;text-align:center">本契約乙式二份，由甲、乙雙方各執一份為憑。【以下空白】</div>
+
+      <div class="sign">
+        <div class="sign-block">
+          <div><strong>甲　方（業主）：</strong></div>
+          <div>姓名／公司：<span class="sign-line"></span></div>
+          <div>統一編號：<span class="sign-line"></span></div>
+          <div>地址：<span class="sign-line"></span></div>
+          <div>電話：<span class="sign-line"></span></div>
+          <div style="margin-top:16px">簽章：<span class="sign-line"></span></div>
+        </div>
+        <div class="sign-block">
+          <div><strong>乙　方（承攬人）：</strong></div>
+          <div>姓名：鄭凱群</div>
+          <div>公司：無澀空間室內裝修股份有限公司</div>
+          <div>統編：90535151</div>
+          <div>地址：台北市內湖區陽光街321巷18號4樓</div>
+          <div style="margin-top:16px">簽章：<span class="sign-line"></span></div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:32px;font-size:12px">
+        中華民國　<strong>${yr}</strong>　年　　　月　　　日
+      </div>
+    </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 800);
+  };
+
+  if (loading) return React.createElement('div', { className: 'loading-center' },
+    React.createElement('div', { className: 'spinner' }), '載入中…'
+  );
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'flex justify-between items-center mb-4' },
+      React.createElement('div', { className: 'section-title' }, '合約'),
+      React.createElement('button', {
+        className: 'btn btn-primary btn-sm',
+        onClick: printContract
+      }, '列印 / 存 PDF')
+    ),
+    React.createElement('div', { className: 'card', style: { padding: 24, maxWidth: 760 } },
+      React.createElement('div', { style: { fontFamily: 'serif', lineHeight: 2 } },
+        // 標題
+        React.createElement('h2', { style: { textAlign: 'center', fontSize: 20, fontWeight: 700, letterSpacing: '.3em', marginBottom: 24 } }, '設 計 裝 修 合 約 書'),
+        // 甲乙方
+        React.createElement('div', { style: { background: '#F8F8F6', padding: '12px 16px', borderRadius: 4, marginBottom: 20, fontSize: 13 } },
+          React.createElement('div', null, React.createElement('strong', null, '甲方（業主）：'), project.client_name || '_______________'),
+          React.createElement('div', null, React.createElement('strong', null, '乙方（承攬人）：'), '鄭凱群 / 無澀空間室內裝修股份有限公司')
+        ),
+        // 各條款預覽
+        ...[
+          ['一、工程名稱', `${project.name || '___'}室內設計裝潢工程`],
+          ['二、工程地點', project.address || '（請至專案總表填寫地址）'],
+          ['三、工程範圍', '依甲方簽認之估價單與設計圖說內容執行。'],
+          ['四、工程總價', contractData ? `NT$${Math.round(contractData.grandTotal).toLocaleString()}（不含稅）` : '讀取中…'],
+          ['五、工程期限', '開工日期、完工日期、工期天數列印時填寫。'],
+          ['六、工程圖說', '乙方提供設計圖說經甲方簽認後，視為合約一部分。'],
+          ['七、工程增減變更', '非附件所列項目，須由雙方簽認書面變更單或通訊軟體之確認，方可施工並納入結算。'],
+          ['八～十六', '所有權、保固、違約罰責、付款方式、智財、保密、管轄法院⋯詳見列印版本。'],
+        ].map(([title, body]) =>
+          React.createElement('div', { key: title, style: { marginBottom: 12 } },
+            React.createElement('div', { style: { fontWeight: 700, fontSize: 13 } }, title),
+            React.createElement('div', { style: { paddingLeft: '1em', fontSize: 13, color: '#444' } }, body)
+          )
+        ),
+        React.createElement('div', { style: { marginTop: 20, padding: '12px 16px', background: '#FFF8E6', borderRadius: 4, fontSize: 12, color: '#7A5A00' } },
+          '💡 付款期程將自動帶入請款單的各期設定。請先至「請款單」分頁確認各期金額後再列印合約。'
+        )
+      )
     )
   );
 }
@@ -12117,6 +12423,9 @@ const TABS = [{
   key: 'payment',
   label: '請款單'
 }, {
+  key: 'contract',
+  label: '合約'
+}, {
   key: 'templates',
   label: '工程資料庫'
 }, {
@@ -12136,6 +12445,7 @@ function ProjectDetailPage({
 }) {
   const [project, setProject] = useState(initialProject);
   const [showPrint, setShowPrint] = useState(false);
+  const [livePaymentStages, setLivePaymentStages] = useState([]);
   const [showUnlock, setShowUnlock] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showCost, setShowCost] = useState(false);
@@ -12254,6 +12564,11 @@ function ProjectDetailPage({
         });
       case 'payment':
         return /*#__PURE__*/React.createElement(PaymentTab, {
+          project: project,
+          onStagesChange: setLivePaymentStages
+        });
+      case 'contract':
+        return /*#__PURE__*/React.createElement(ContractTab, {
           project: project
         });
       case 'settlement':
@@ -12400,7 +12715,8 @@ function ProjectDetailPage({
   }, renderTab()), /*#__PURE__*/React.createElement(PrintModal, {
     open: showPrint,
     onClose: () => setShowPrint(false),
-    project: project
+    project: project,
+    livePaymentStages: livePaymentStages
   }), /*#__PURE__*/React.createElement(ProjectMembersModal, {
     open: showMembers,
     onClose: () => setShowMembers(false),
