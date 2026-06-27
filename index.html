@@ -932,7 +932,7 @@ function openPrintWindow(project, data, sections, paymentMode) {
   }
 
   // ── Payment Page ──
-  if (sections.payment && data.paymentStages && data.paymentStages.length > 0) {
+  if (sections.payment) { // 有勾選就列印，paymentStages 可為空
     const ps = data.paymentStages;
     const currentStage = ps.find(s => s.is_current) || ps[ps.length - 1];
     const totalAmount = ps.reduce((s, st) => s + (st.amount || 0), 0);
@@ -1137,6 +1137,7 @@ function PrintModal({
   }));
   const doPrint = () => {
     if (!data) return;
+    if (sections.payment) toast('請款階段筆數：' + (data.paymentStages || []).length);
     openPrintWindow(project, data, sections, paymentMode);
     onClose();
   };
@@ -9338,7 +9339,39 @@ function SettlementTab({
   }, totalVendor - totalPaid > 0 ? '尚欠 ' + fmt(totalVendor - totalPaid) : '')))))));
 }
 // 完全獨立的金額輸入元件，不受外部 re-render 影響
-function StageAmountInput({ stageId, value, onSave, color }) {
+// 比例輸入元件：只存前端，不寫資料庫percentage欄位
+function StagePctInput({ stageId, defaultPct, isLast, onSave }) {
+  const [editing, setEditing] = React.useState(false);
+  const [local, setLocal] = React.useState(String(defaultPct));
+
+  const handleBlur = () => {
+    setEditing(false);
+    const pct = Math.min(100, Math.max(0, parseFloat(local) || 0));
+    setLocal(String(pct));
+    onSave(pct);
+  };
+
+  if (isLast) return React.createElement('span', { style: { color: '#AAA', fontSize: 12 } }, local + '%');
+
+  if (editing) return React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
+    React.createElement('input', {
+      type: 'number', autoFocus: true,
+      value: local,
+      style: { width: 50, textAlign: 'right', fontSize: 13, border: '1px solid #888', borderRadius: 4, padding: '2px 4px' },
+      onChange: e => setLocal(e.target.value),
+      onBlur: handleBlur,
+      onKeyDown: e => { if (e.key === 'Enter') e.target.blur(); }
+    }),
+    React.createElement('span', { style: { fontSize: 12, color: '#888', marginLeft: 2 } }, '%')
+  );
+
+  return React.createElement('div', {
+    style: { textAlign: 'right', cursor: 'pointer', color: '#555', fontSize: 13, padding: '2px 4px' },
+    onClick: () => setEditing(true)
+  }, local + '%');
+}
+
+function StageAmountInput({ stageId, value, onSave, color, suffix }) {
   const [local, setLocal] = React.useState(String(value ?? 0));
   const prevStageId = React.useRef(stageId);
 
@@ -9356,26 +9389,29 @@ function StageAmountInput({ stageId, value, onSave, color }) {
     if (num !== value) onSave(num);
   };
 
-  return React.createElement('input', {
-    type: 'number',
-    value: local,
-    style: {
-      textAlign: 'right',
-      width: 110,
-      border: 'none',
-      background: 'transparent',
-      fontSize: 13,
-      fontFamily: 'inherit',
-      color: color || 'inherit',
-      outline: 'none',
-      padding: '2px 4px',
-      borderRadius: 4,
-    },
-    onChange: e => setLocal(e.target.value),
-    onBlur: handleBlur,
-    onKeyDown: e => { if (e.key === 'Enter') e.target.blur(); },
-    onFocus: e => { e.target.style.background = '#fff'; e.target.style.border = '1px solid #888'; },
-  });
+  return React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
+    React.createElement('input', {
+      type: 'number',
+      value: local,
+      style: {
+        textAlign: 'right',
+        width: suffix ? 50 : 110,
+        border: 'none',
+        background: 'transparent',
+        fontSize: 13,
+        fontFamily: 'inherit',
+        color: color || 'inherit',
+        outline: 'none',
+        padding: '2px 4px',
+        borderRadius: 4,
+      },
+      onChange: e => setLocal(e.target.value),
+      onBlur: handleBlur,
+      onKeyDown: e => { if (e.key === 'Enter') e.target.blur(); },
+      onFocus: e => { e.target.style.background = '#fff'; e.target.style.border = '1px solid #888'; },
+    }),
+    suffix ? React.createElement('span', { style: { fontSize: 12, color: '#888', marginLeft: 1 } }, suffix) : null
+  );
 }
 
 function PaymentTab({
@@ -9416,9 +9452,13 @@ function PaymentTab({
   };
 
   const isAmountsWrong = (stgs) => {
-    // 只偵測全部金額相同（明顯是舊錯誤資料），不自動偵測差額
     if (stgs.length < 2) return false;
-    return stgs.every(s => s.amount === stgs[0].amount) && stgs[0].amount > 0;
+    // 全部金額相同（舊錯誤資料）
+    if (stgs.every(s => s.amount === stgs[0].amount) && stgs[0].amount > 0) return true;
+    // 超過一半的期款金額是 0（未正確計算）
+    const zeroCount = stgs.filter(s => !s.amount || s.amount === 0).length;
+    if (zeroCount > stgs.length / 2) return true;
+    return false;
   };
 
   const resetAndRecalc = async (gt, existingStages) => {
@@ -9614,7 +9654,17 @@ function PaymentTab({
                 React.createElement('td', null,
                   React.createElement(InlineEdit, { value: s.name, onChange: val => updateStage(s.id, 'name', val) })
                 ),
-                React.createElement('td', { className: 'num', style: { color: '#888', fontSize: 12 } }, (s.percentage || 0) + '%'),
+                React.createElement('td', { className: 'num' },
+                  React.createElement(StagePctInput, {
+                    stageId: s.id,
+                    defaultPct: DEFAULT_STAGES[idx]?.percentage || 0,
+                    isLast: isLast,
+                    onSave: pct => {
+                      const amt = Math.round(grandTotal * pct / 100);
+                      updateStage(s.id, 'amount', amt);
+                    }
+                  })
+                ),
                 React.createElement('td', { className: 'num' },
                   isLast
                     ? React.createElement('span', { style: { color: '#555' } },
