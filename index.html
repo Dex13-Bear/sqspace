@@ -716,9 +716,9 @@ function openPrintWindow(project, data, sections, paymentMode) {
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:8px">BILLED TO</div>
           <div style="font-size:13px;line-height:2;color:#1A1A18;margin-bottom:20px">
             <div style="font-weight:700">${esc(project.client_name || '—')}</div>
-            ${project.contact_person ? `<div>${esc(project.contact_person)}</div>` : ''}
-            ${project.address ? `<div>${esc(project.address)}</div>` : ''}
-            ${project.contact_phone ? `<div>${esc(project.contact_phone)}</div>` : ''}
+            ${project.contact_person ? '<div>' + esc(project.contact_person) + '</div>' : ''}
+            ${project.address ? '<div>' + esc(project.address) + '</div>' : ''}
+            ${project.contact_phone ? '<div>' + esc(project.contact_phone) + '</div>' : ''}
           </div>
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:8px">Payment Items</div>
           <div style="font-size:12px;color:#555;line-height:2.2">${paymentBlock}</div>
@@ -746,7 +746,7 @@ function openPrintWindow(project, data, sections, paymentMode) {
             <td style="padding:10px 0 6px;font-size:12px;color:#888;text-align:right;border-top:1px solid #DDD">Sub Total</td>
             <td style="padding:10px 0 6px;font-size:12px;color:#1A1A18;text-align:right;white-space:nowrap;border-top:1px solid #DDD">$ ${(workTotal + mgmtFee).toLocaleString()}</td>
           </tr>
-          ${project.tax_enabled ? `<tr><td colspan="3"></td><td style="padding:4px 0;font-size:12px;color:#888;text-align:right">Tax (${project.tax_rate || 5}%)</td><td style="padding:4px 0;font-size:12px;color:#1A1A18;text-align:right;white-space:nowrap">$ ${tax.toLocaleString()}</td></tr>` : ''}
+          ${project.tax_enabled ? '<tr><td colspan="3"></td><td style="padding:4px 0;font-size:12px;color:#888;text-align:right">Tax (' + (project.tax_rate || 5) + '%)</td><td style="padding:4px 0;font-size:12px;color:#1A1A18;text-align:right;white-space:nowrap">$ ' + tax.toLocaleString() + '</td></tr>' : ''}
           <tr>
             <td colspan="2" style="padding:0;border-top:1.5px solid #1A1A18"></td>
             <td style="padding:10px 0;border-top:1.5px solid #1A1A18"></td>
@@ -917,11 +917,11 @@ function openPrintWindow(project, data, sections, paymentMode) {
   if (sections.gallery && gallery.length > 0) {
     const cards = gallery.map(g => `
       <div class="gallery-card">
-        ${g.image_url ? `<div style="width:100%;height:130px;display:flex;align-items:center;justify-content:center;background:#F8F8F6;overflow:hidden"><img src="${esc(g.image_url)}" style="max-width:100%;max-height:130px;object-fit:contain;display:block"></div>` : `<div style="height:130px;background:#F5F5F3;display:flex;align-items:center;justify-content:center;color:#CCC;font-size:12px">無圖片</div>`}
+        ${g.image_url ? '<div style="width:100%;height:130px;display:flex;align-items:center;justify-content:center;background:#F8F8F6;overflow:hidden"><img src="' + esc(g.image_url) + '" style="max-width:100%;max-height:130px;object-fit:contain;display:block"></div>' : '<div style="height:130px;background:#F5F5F3;display:flex;align-items:center;justify-content:center;color:#CCC;font-size:12px">無圖片</div>'}
         <div style="padding:5px 7px">
           <div style="font-weight:600;font-size:11px">${esc(g.name || '未命名')}</div>
-          ${g.description ? `<div style="font-size:10px;color:#666;margin-top:2px">${esc(g.description)}</div>` : ''}
-          ${g.price ? `<div style="font-size:10px;color:#2E4D5C;margin-top:2px">參考價格：${fmtN(g.price)}</div>` : ''}
+          ${g.description ? '<div style="font-size:10px;color:#666;margin-top:2px">' + esc(g.description) + '</div>' : ''}
+          ${g.price ? '<div style="font-size:10px;color:#2E4D5C;margin-top:2px">參考價格：' + fmtN(g.price) + '</div>' : ''}
         </div>
       </div>`).join('');
     body += `<div class="page">
@@ -984,8 +984,8 @@ function openPrintWindow(project, data, sections, paymentMode) {
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:8px">BILLED TO</div>
           <div style="font-size:13px;line-height:2;color:#1A1A18;margin-bottom:20px">
             <div style="font-weight:700">${esc(project.client_name || project.contact_person || '—')}</div>
-            ${project.contact_person ? `<div>${esc(project.contact_person)}</div>` : ''}
-            ${project.address ? `<div>${esc(project.address)}</div>` : ''}
+            ${project.contact_person ? '<div>' + esc(project.contact_person) + '</div>' : ''}
+            ${project.address ? '<div>' + esc(project.address) + '</div>' : ''}
           </div>
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:8px">Payment Items</div>
           <div style="font-size:12px;color:#555;line-height:2.2">${paymentBlock2 || '<div style="color:#CCC">—</div>'}</div>
@@ -1025,13 +1025,7 @@ function openPrintWindow(project, data, sections, paymentMode) {
         </tfoot>
       </table>
 
-      ${currentStages.length > 0 ? `
-      <!-- 本期請款框 -->
-      <div style="border:1.5px solid #2E4D5C;border-radius:6px;padding:16px 20px;margin-top:24px">
-        <div style="font-size:11px;color:#666;margin-bottom:8px">本期請款項目：${currentStages.map(s => esc(s.name)).join('、')}</div>
-        ${currentStages.map(s => `<div style="font-size:12px;margin-bottom:3px">${esc(s.name)}：${fmtN(s.amount)}</div>`).join('')}
-        <div style="font-size:18px;font-weight:800;color:#8B2E2E;margin-top:10px;text-align:right">本期總計應匯款：${fmtN(totalDue)}</div>
-      </div>` : ''}
+      ${currentStages.length > 0 ? '<div style="border:1.5px solid #2E4D5C;border-radius:6px;padding:16px 20px;margin-top:24px"><div style="font-size:11px;color:#666;margin-bottom:8px">本期請款項目：' + currentStages.map(s => esc(s.name)).join('、') + '</div>' + currentStages.map(s => '<div style="font-size:12px;margin-bottom:3px">' + esc(s.name) + '：' + fmtN(s.amount) + '</div>').join('') + '<div style="font-size:18px;font-weight:800;color:#8B2E2E;margin-top:10px;text-align:right">本期總計應匯款：' + fmtN(totalDue) + '</div></div>' : ''}
 
       <!-- 簽收 -->
       <div style="display:flex;justify-content:space-between;margin-top:32px;padding-top:16px">
@@ -9706,7 +9700,18 @@ function PaymentTab({
                 React.createElement('td', null,
                   React.createElement('input', { className: 'form-input-sm', type: 'date',
                     value: s.paid_date || '',
-                    onChange: e => updateStage(s.id, 'paid_date', e.target.value)
+                    onChange: e => {
+                      const date = e.target.value;
+                      updateStage(s.id, 'paid_date', date);
+                      // 填入付款日期時，若已收金額為0，自動設為應收金額（已結清）
+                      if (date && !(s.paid_amount > 0)) {
+                        updateStage(s.id, 'paid_amount', s.amount || 0);
+                      }
+                      // 清除日期時，清空已收金額
+                      if (!date) {
+                        updateStage(s.id, 'paid_amount', 0);
+                      }
+                    }
                   })
                 ),
                 React.createElement('td', null,
@@ -9960,15 +9965,7 @@ function ContractTab({ project }) {
       <div class="clause" style="page-break-inside:avoid">
         <div class="clause-title">十二、付款方式與進度</div>
         <div class="clause-body">
-          ${stageRows ? `<table>
-            <thead><tr style="background:#F2F2F0">
-              <th style="padding:6px 10px;border:1px solid #DDD;text-align:left">期別</th>
-              <th style="padding:6px 10px;border:1px solid #DDD;text-align:left">付款時機</th>
-              <th style="padding:6px 10px;border:1px solid #DDD;text-align:right">金額</th>
-              <th style="padding:6px 10px;border:1px solid #DDD;text-align:center">比例</th>
-            </tr></thead>
-            <tbody>${stageRows}</tbody>
-          </table>` : '<div style="color:#CCC">（請先在請款單分頁設定各期金額）</div>'}
+          ${stageRows ? '<table><thead><tr style="background:#F2F2F0"><th style="padding:6px 10px;border:1px solid #DDD;text-align:left">期別</th><th style="padding:6px 10px;border:1px solid #DDD;text-align:left">付款時機</th><th style="padding:6px 10px;border:1px solid #DDD;text-align:right">金額</th><th style="padding:6px 10px;border:1px solid #DDD;text-align:center">比例</th></tr></thead><tbody>' + stageRows + '</tbody></table>' : '<div style="color:#CCC">（請先在請款單分頁設定各期金額）</div>'}
           <div style="margin-top:10px"><strong>匯款資訊：</strong></div>
           <div class="sub">銀行：台北富邦 營業部（代碼 012）</div>
           <div class="sub">戶名：鄭凱群　　帳號：816-8000-8713711</div>
