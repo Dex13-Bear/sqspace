@@ -936,7 +936,11 @@ function openPrintWindow(project, data, sections, paymentMode) {
     const ps = data.paymentStages;
     const currentStages = ps.filter(s => s.is_current); // 支援多選
     const totalAmount = ps.reduce((s, st) => s + (st.amount || 0), 0);
-    const totalPaid = ps.reduce((s, st) => s + (st.paid_amount || 0), 0);
+    const totalPaid = ps.reduce((s, st) => {
+      if ((st.paid_amount || 0) > 0) return s + (st.paid_amount || 0);
+      if (st.paid_date) return s + (st.amount || 0); // 有日期視為已付全額
+      return s;
+    }, 0);
     const unpaid = totalAmount - totalPaid;
     // 本期總計 = 勾選期的（應收 - 已付）加總
     const totalDue = currentStages.reduce((acc, s) => acc + Math.max(0, (s.amount || 0) - (s.paid_amount || 0)), 0);
@@ -944,6 +948,7 @@ function openPrintWindow(project, data, sections, paymentMode) {
     const stageStatusLabel = function (s) {
       if (!s.amount) return '未設定';
       if ((s.paid_amount || 0) >= s.amount) return '已結清';
+      if (s.paid_date) return '已結清'; // 有付款日期視為已結清
       if ((s.paid_amount || 0) > 0) return '部分付款';
       return '未付款';
     };
@@ -3652,6 +3657,7 @@ function WorkDetailTab({
   onLock,
   showCost
 }) {
+  const [scheme, setScheme] = useState('A'); // A/B 方案
   const [cats, setCats] = useState([]);
   const [items, setItems] = useState([]);
   const [collapsed, setCollapsed] = useState({});
@@ -3675,15 +3681,11 @@ function WorkDetailTab({
   const [importText, setImportText] = useState('');
   const [importPreview, setImportPreview] = useState([]);
   const load = useCallback(async () => {
-    const {
-      data: c
-    } = await db.from('work_categories').select('*').eq('project_id', project.id).order('sort_order');
-    const {
-      data: i
-    } = await db.from('work_items').select('*').eq('project_id', project.id).order('sort_order');
+    const { data: c } = await db.from('work_categories').select('*').eq('project_id', project.id).eq('scheme', scheme).order('sort_order');
+    const { data: i } = await db.from('work_items').select('*').eq('project_id', project.id).eq('scheme', scheme).order('sort_order');
     setCats(c || []);
     setItems(i || []);
-  }, [project.id]);
+  }, [project.id, scheme]);
   useEffect(() => {
     load();
   }, [load]);
@@ -3707,7 +3709,8 @@ function WorkDetailTab({
       ...newItem,
       project_id: project.id,
       category_id: showAddItem,
-      sort_order: catItems(showAddItem).length
+      sort_order: catItems(showAddItem).length,
+      scheme: scheme
     });
     if (project.is_locked) {
       const cat = cats.find(c => c.id === showAddItem);
@@ -3786,7 +3789,8 @@ function WorkDetailTab({
     await db.from('work_categories').insert({
       project_id: project.id,
       name: newCatName,
-      sort_order: cats.length
+      sort_order: cats.length,
+      scheme: scheme
     });
     setShowAddCat(false);
     setNewCatName('');
@@ -4017,11 +4021,50 @@ function WorkDetailTab({
     load();
   };
   const realCost = items.reduce((s, i) => s + (i.cost_price || 0) * i.quantity, 0);
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+
+  const copySchemeAtoB = async () => {
+    if (!confirm('此動作會以 A 方案覆蓋現有 B 方案，確定繼續？')) return;
+    const { data: bCats } = await db.from('work_categories').select('id').eq('project_id', project.id).eq('scheme', 'B');
+    for (const c of bCats || []) {
+      await db.from('work_items').delete().eq('category_id', c.id);
+      await db.from('work_categories').delete().eq('id', c.id);
+    }
+    const { data: aCats } = await db.from('work_categories').select('*').eq('project_id', project.id).eq('scheme', 'A').order('sort_order');
+    const { data: aItems } = await db.from('work_items').select('*').eq('project_id', project.id).eq('scheme', 'A').order('sort_order');
+    for (const cat of aCats || []) {
+      const { data: newCat } = await db.from('work_categories').insert({ project_id: project.id, name: cat.name, sort_order: cat.sort_order, scheme: 'B' }).select().single();
+      if (newCat) {
+        const its = (aItems || []).filter(i => i.category_id === cat.id);
+        for (const item of its) {
+          await db.from('work_items').insert({ project_id: project.id, category_id: newCat.id, name: item.name, unit: item.unit, quantity: item.quantity, unit_price: item.unit_price, cost_price: item.cost_price, notes: item.notes, sort_order: item.sort_order, scheme: 'B' });
+        }
+      }
+    }
+    toast('已複製 A 方案到 B 方案');
+    load();
+  };
+
+  return /*#__PURE__*/React.createElement("div", null,
+    React.createElement("div", { className: "flex gap-2 mb-3", style: { borderBottom: '2px solid #E8E8E0', paddingBottom: 12 } },
+      React.createElement("button", {
+        className: "btn btn-sm " + (scheme === 'A' ? "btn-primary" : "btn-ghost"),
+        onClick: () => setScheme('A')
+      }, "報價 A 方案"),
+      React.createElement("button", {
+        className: "btn btn-sm " + (scheme === 'B' ? "btn-primary" : "btn-ghost"),
+        onClick: () => setScheme('B')
+      }, "報價 B 方案"),
+      scheme === 'B' && React.createElement("button", {
+        className: "btn btn-ghost btn-sm",
+        style: { color: '#555', borderColor: '#999', marginLeft: 8 },
+        onClick: copySchemeAtoB
+      }, "⟳ 複製 A 方案架構")
+    ),
+    /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between items-center mb-4"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "section-title"
-  }, "\u5DE5\u7A0B\u660E\u7D30"), showCost && /*#__PURE__*/React.createElement("div", {
+  }, scheme === 'A' ? "工程明細　A 方案" : "工程明細　B 方案"), showCost && /*#__PURE__*/React.createElement("div", {
     className: "text-sm text-muted mt-1"
   }, "\u767C\u5305\u5BE6\u969B\u6210\u672C\uFF1A", fmt(realCost), " \uFF5C \u9810\u4F30\u6BDB\u5229\uFF1A", fmt(workTotal - realCost))), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
@@ -9549,7 +9592,11 @@ function PaymentTab({
   }, [project.id]);
 
   const LAST_IDX = DEFAULT_STAGES.length - 1;
-  const totalPaid = stages.reduce((s, st) => s + (st.paid_amount || 0), 0);
+  const totalPaid = stages.reduce((s, st) => {
+    if ((st.paid_amount || 0) > 0) return s + (st.paid_amount || 0);
+    if (st.paid_date) return s + (st.amount || 0); // 有日期視為已付全額
+    return s;
+  }, 0);
   const totalAmount = stages.reduce((s, st) => s + (st.amount || 0), 0);
   const diff = Math.round(grandTotal) - totalAmount;
 
@@ -9598,6 +9645,7 @@ function PaymentTab({
   const statusLabel = stage => {
     if (!stage.amount) return '未設定';
     if ((stage.paid_amount || 0) >= stage.amount) return '已結清';
+    if (stage.paid_date) return '已結清'; // 有付款日期視為已結清
     if ((stage.paid_amount || 0) > 0) return '部分付款';
     return '未付款';
   };
