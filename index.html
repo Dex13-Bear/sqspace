@@ -9470,6 +9470,7 @@ function PaymentTab({
 }) {
   const [stages, setStages] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
+  const [changeDiff, setChangeDiff] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const DEFAULT_STAGES = [
@@ -9556,17 +9557,25 @@ function PaymentTab({
     (async () => {
       setLoading(true);
       try {
-        const [sRes, wiRes, piRes] = await Promise.all([
+        const [sRes, wiRes, piRes, coRes] = await Promise.all([
           db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order'),
           db.from('work_items').select('*').eq('project_id', project.id),
           db.from('purchase_items').select('*').eq('project_id', project.id),
+          db.from('change_orders').select('*').eq('project_id', project.id),
         ]);
         if (cancelled) return;
         const wi = wiRes.data || [];
         const pi = piRes.data || [];
+        const co = coRes.data || [];
         const existingStages = sRes.data || [];
         const gt = calcGrandTotal(wi, pi);
         setGrandTotal(gt);
+        // 計算追加追減總差額
+        const diff = co.reduce((s, o) => {
+          const d = (o.new_price || 0) * (o.new_quantity || 1) - (o.original_price || 0) * (o.original_quantity || 1);
+          return s + (o.change_type === 'reduce' ? -Math.abs(d) : d);
+        }, 0);
+        setChangeDiff(diff);
 
         if (existingStages.length === 0) {
           // 新建：逐筆 insert 避免批次失敗
@@ -9769,12 +9778,24 @@ function PaymentTab({
             })
           ),
           React.createElement('tfoot', null,
+            changeDiff !== 0 && React.createElement('tr', { style: { background: '#FFF8E6' } },
+              React.createElement('td', { colSpan: 2, style: { padding: '8px 12px', color: '#7A5A00', fontSize: 12 } },
+                React.createElement('span', { style: { fontWeight: 600 } }, '追加追減'),
+                React.createElement('span', { style: { marginLeft: 8, fontSize: 11, color: '#999' } }, '（詳見追加追減分頁）')
+              ),
+              React.createElement('td', { className: 'num', style: { padding: '8px 12px', color: changeDiff >= 0 ? '#3A5240' : '#DC2626', fontWeight: 600 } },
+                (changeDiff >= 0 ? '+' : '') + fmt(changeDiff)
+              ),
+              React.createElement('td', { className: 'num', style: { padding: '8px 12px', color: '#999', fontSize: 11 } }, '—'),
+              React.createElement('td'),
+              React.createElement('td')
+            ),
             React.createElement('tr', { style: { background: '#F5F5F3', fontWeight: 700 } },
               React.createElement('td', { colSpan: 3, style: { padding: '10px 12px', textAlign: 'right' } }, '總計'),
-              React.createElement('td', { className: 'num', style: { padding: '10px 12px', color: Math.abs(diff) < 2 ? '#3A5240' : '#8B2E2E' } }, fmt(totalAmount)),
+              React.createElement('td', { className: 'num', style: { padding: '10px 12px', color: Math.abs(diff) < 2 ? '#3A5240' : '#8B2E2E' } }, fmt(totalAmount + changeDiff)),
               React.createElement('td', { className: 'num', style: { padding: '10px 12px', color: '#3A5240' } }, fmt(totalPaid)),
               React.createElement('td'),
-              React.createElement('td', { style: { padding: '10px 12px', color: '#8B2E2E', fontSize: 12 } }, '未收：' + fmt(Math.max(0, totalAmount - totalPaid)))
+              React.createElement('td', { style: { padding: '10px 12px', color: '#8B2E2E', fontSize: 12 } }, '未收：' + fmt(Math.max(0, totalAmount + changeDiff - totalPaid)))
             )
           )
         )
@@ -9809,12 +9830,21 @@ function PaymentTab({
             ))
           ),
           React.createElement('tfoot', null,
+            changeDiff !== 0 && React.createElement('tr', { style: { background: '#FFF8E6' } },
+              React.createElement('td', { style: { padding: '7px 12px', color: '#7A5A00', fontSize: 12, fontWeight: 600 } }, '追加追減'),
+              React.createElement('td', { className: 'num', style: { padding: '7px 12px', color: changeDiff >= 0 ? '#3A5240' : '#DC2626', fontWeight: 600 } },
+                (changeDiff >= 0 ? '+' : '') + fmt(changeDiff)
+              ),
+              React.createElement('td', { className: 'num', style: { padding: '7px 12px', color: '#999', fontSize: 11 } }, '—'),
+              React.createElement('td'),
+              React.createElement('td')
+            ),
             React.createElement('tr', { style: { background: '#F8F8F6' } },
               React.createElement('td', { style: { padding: '10px 12px', fontWeight: 700 } }, '總計'),
-              React.createElement('td', { className: 'num', style: { fontWeight: 700 } }, fmt(totalAmount)),
+              React.createElement('td', { className: 'num', style: { fontWeight: 700 } }, fmt(totalAmount + changeDiff)),
               React.createElement('td', { className: 'num', style: { color: '#333', fontWeight: 700 } }, fmt(totalPaid)),
               React.createElement('td'),
-              React.createElement('td', { style: { color: '#8B2E2E', fontWeight: 700 } }, '未收尾款：', fmt(Math.max(0, totalAmount - totalPaid)))
+              React.createElement('td', { style: { color: '#8B2E2E', fontWeight: 700 } }, '未收尾款：', fmt(Math.max(0, totalAmount + changeDiff - totalPaid)))
             )
           )
         )
