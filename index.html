@@ -9599,12 +9599,13 @@ function PaymentTab({
         const existingStages = sRes.data || [];
         const gt = calcGrandTotal(wi, pi);
         setGrandTotal(gt);
-        // 計算追加追減總差額
-        const diff = co.reduce((s, o) => {
+        // 計算追加追減總差額（含管理費）
+        const diffBase = co.reduce((s, o) => {
           const d = (o.new_price || 0) * (o.new_quantity || 1) - (o.original_price || 0) * (o.original_quantity || 1);
           return s + (o.change_type === 'reduce' ? -Math.abs(d) : d);
         }, 0);
-        setChangeDiff(diff);
+        const mgmtR = (project.management_fee_rate || 7) / 100;
+        setChangeDiff(Math.round(diffBase * (1 + mgmtR)));
 
         if (existingStages.length === 0) {
           // 新建：逐筆 insert 避免批次失敗
