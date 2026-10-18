@@ -14542,6 +14542,7 @@ function PaymentTab({
   const [stages, setStages] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
   const [changeDiff, setChangeDiff] = useState(0);
+  const [changeIncluded, setChangeIncluded] = useState(false); // 追加減是否納入本期
   const [loading, setLoading] = useState(true);
 
   const DEFAULT_STAGES = [
@@ -14850,8 +14851,14 @@ function PaymentTab({
             })
           ),
           React.createElement('tfoot', null,
-            changeDiff !== 0 && React.createElement('tr', { style: { background: '#FFF8E6' } },
-              React.createElement('td', { colSpan: 2, style: { padding: '8px 12px', color: '#7A5A00', fontSize: 12 } },
+            changeDiff !== 0 && React.createElement('tr', { style: { background: changeIncluded ? '#FFF0CC' : '#FFF8E6' } },
+              React.createElement('td', { style: { padding: '8px 12px', textAlign: 'center' } },
+                React.createElement('input', { type: 'checkbox', checked: changeIncluded,
+                  onChange: () => setChangeIncluded(v => !v),
+                  title: '勾選後納入本期請款總計'
+                })
+              ),
+              React.createElement('td', { style: { padding: '8px 12px', color: '#7A5A00', fontSize: 12 } },
                 React.createElement('span', { style: { fontWeight: 600 } }, '追加追減'),
                 React.createElement('span', { style: { marginLeft: 8, fontSize: 11, color: '#999' } }, '（詳見追加追減分頁）')
               ),
@@ -14902,8 +14909,10 @@ function PaymentTab({
             ))
           ),
           React.createElement('tfoot', null,
-            changeDiff !== 0 && React.createElement('tr', { style: { background: '#FFF8E6' } },
-              React.createElement('td', { style: { padding: '7px 12px', color: '#7A5A00', fontSize: 12, fontWeight: 600 } }, '追加追減'),
+            changeDiff !== 0 && React.createElement('tr', { style: { background: changeIncluded ? '#FFF0CC' : '#FFF8E6' } },
+              React.createElement('td', { style: { padding: '7px 12px', color: '#7A5A00', fontSize: 12, fontWeight: changeIncluded ? 700 : 600 } },
+                '追加追減', changeIncluded ? '（本期納入）' : ''
+              ),
               React.createElement('td', { className: 'num', style: { padding: '7px 12px', color: changeDiff >= 0 ? '#3A5240' : '#DC2626', fontWeight: 600 } },
                 (changeDiff >= 0 ? '+' : '') + fmt(changeDiff)
               ),
@@ -14924,9 +14933,9 @@ function PaymentTab({
       (() => {
         const currentStages = stages.filter(s => s.is_current);
         if (currentStages.length === 0) return null;
-        // 本期總計 = 勾選期金額 + 追加減（若有）
+        // 本期總計 = 勾選期金額 + 追加減（若有勾選）
         const stagesTotal = currentStages.reduce((acc, s) => acc + Math.max(0, (s.amount || 0) - (s.paid_amount || 0)), 0);
-        const thisTotal = stagesTotal + (changeDiff || 0);
+        const thisTotal = stagesTotal + (changeIncluded ? (changeDiff || 0) : 0);
         const names = currentStages.map(s => s.name).join('、');
         return React.createElement('div', { style: { border: '2px solid #2E4D5C', borderRadius: 8, padding: '16px 20px', marginTop: 16 } },
           React.createElement('div', { style: { fontSize: 13, marginBottom: 6 } }, '本期請款項目：', names),
@@ -14934,7 +14943,7 @@ function PaymentTab({
             s.name, '：', fmt(s.amount),
             (s.paid_amount || 0) > 0 ? React.createElement('span', { style: { color: '#3A5240', marginLeft: 8 } }, '（已付 ', fmt(s.paid_amount), '）') : null
           )),
-          changeDiff !== 0 && React.createElement('div', { style: { fontSize: 13, marginBottom: 2, color: changeDiff > 0 ? '#3A5240' : '#DC2626' } },
+          changeDiff !== 0 && changeIncluded && React.createElement('div', { style: { fontSize: 13, marginBottom: 2, color: changeDiff > 0 ? '#3A5240' : '#DC2626' } },
             '追加減（含管理費）：', changeDiff > 0 ? '+' : '', fmt(changeDiff)
           ),
           React.createElement('div', { style: { fontSize: 20, fontWeight: 800, color: '#8B2E2E', marginTop: 12 } }, '本期總計應匯款：', fmt(thisTotal))
