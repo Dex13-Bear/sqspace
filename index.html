@@ -4897,14 +4897,13 @@ function ChangeOrdersTab({
     notes: ''
   });
   const load = useCallback(async () => {
-    const {
-      data
-    } = await db.from('change_orders').select('*').eq('project_id', project.id).order('created_at', {
-      ascending: false
-    });
-    const {
-      data: c
-    } = await db.from('work_categories').select('name').eq('project_id', project.id);
+    let { data, error: loadErr } = await db.from('change_orders').select('*').eq('project_id', project.id).order('created_at', { ascending: false });
+    if (loadErr || !data) {
+      // created_at 欄位可能不存在，改用 id 排序
+      const { data: data2 } = await db.from('change_orders').select('*').eq('project_id', project.id).order('id', { ascending: false });
+      data = data2;
+    }
+    const { data: c } = await db.from('work_categories').select('name').eq('project_id', project.id).eq('scheme', 'A');
     setOrders(data || []);
     setCats(c || []);
   }, [project.id]);
@@ -4920,10 +4919,20 @@ function ChangeOrdersTab({
   const totalDiff = totalDiffBase + totalDiffMgmt;
   const addOrder = async () => {
     if (!newOrder.item_name.trim()) return;
-    await db.from('change_orders').insert({
-      ...newOrder,
-      project_id: project.id
-    });
+    const payload = {
+      project_id: project.id,
+      category_name: newOrder.category_name || '',
+      item_name: newOrder.item_name,
+      unit: newOrder.unit || '式',
+      change_type: newOrder.change_type || 'add',
+      new_quantity: newOrder.new_quantity || 1,
+      new_price: newOrder.new_price || 0,
+      notes: newOrder.notes || ''
+    };
+    if (newOrder.original_quantity != null) payload.original_quantity = newOrder.original_quantity;
+    if (newOrder.original_price != null) payload.original_price = newOrder.original_price;
+    const { error: addErr } = await db.from('change_orders').insert(payload);
+    if (addErr) { toast('新增失敗：' + (addErr.message || JSON.stringify(addErr)), 'error'); return; }
     toast('已新增追加/追減項目');
     setShowAdd(false);
     setNewOrder({
@@ -9919,14 +9928,13 @@ function ChangeOrdersTab({
     notes: ''
   });
   const load = useCallback(async () => {
-    const {
-      data
-    } = await db.from('change_orders').select('*').eq('project_id', project.id).order('created_at', {
-      ascending: false
-    });
-    const {
-      data: c
-    } = await db.from('work_categories').select('name').eq('project_id', project.id);
+    let { data, error: loadErr } = await db.from('change_orders').select('*').eq('project_id', project.id).order('created_at', { ascending: false });
+    if (loadErr || !data) {
+      // created_at 欄位可能不存在，改用 id 排序
+      const { data: data2 } = await db.from('change_orders').select('*').eq('project_id', project.id).order('id', { ascending: false });
+      data = data2;
+    }
+    const { data: c } = await db.from('work_categories').select('name').eq('project_id', project.id).eq('scheme', 'A');
     setOrders(data || []);
     setCats(c || []);
   }, [project.id]);
@@ -9942,10 +9950,20 @@ function ChangeOrdersTab({
   const totalDiff = totalDiffBase + totalDiffMgmt;
   const addOrder = async () => {
     if (!newOrder.item_name.trim()) return;
-    await db.from('change_orders').insert({
-      ...newOrder,
-      project_id: project.id
-    });
+    const payload = {
+      project_id: project.id,
+      category_name: newOrder.category_name || '',
+      item_name: newOrder.item_name,
+      unit: newOrder.unit || '式',
+      change_type: newOrder.change_type || 'add',
+      new_quantity: newOrder.new_quantity || 1,
+      new_price: newOrder.new_price || 0,
+      notes: newOrder.notes || ''
+    };
+    if (newOrder.original_quantity != null) payload.original_quantity = newOrder.original_quantity;
+    if (newOrder.original_price != null) payload.original_price = newOrder.original_price;
+    const { error: addErr } = await db.from('change_orders').insert(payload);
+    if (addErr) { toast('新增失敗：' + (addErr.message || JSON.stringify(addErr)), 'error'); return; }
     toast('已新增追加/追減項目');
     setShowAdd(false);
     setNewOrder({
