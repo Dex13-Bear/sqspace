@@ -1103,7 +1103,8 @@ function PrintModal({
     purchase: false,
     schedule: false,
     gallery: false,
-    payment: true
+    payment: true,
+    change: false
   });
   const [paymentMode, setPaymentMode] = useState('personal');
   const [data, setData] = useState(null);
@@ -1112,7 +1113,7 @@ function PrintModal({
     if (!open || !project) return;
     setData(null);
     setLoading(true);
-    Promise.all([db.from('work_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('work_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('gallery').select('*').eq('project_id', project.id).eq('is_selected', true), db.from('bank_accounts').select('*').order('sort_order'), db.from('settings').select('*'), db.from('schedule_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('schedule_events').select('*').eq('project_id', project.id).order('start_date'), db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order')]).then(([c, i, pc, pi, g, b, s, sched, sevents, pay]) => {
+    Promise.all([db.from('work_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('work_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('gallery').select('*').eq('project_id', project.id).eq('is_selected', true), db.from('bank_accounts').select('*').order('sort_order'), db.from('settings').select('*'), db.from('schedule_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('schedule_events').select('*').eq('project_id', project.id).order('start_date'), db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order'), db.from('change_orders').select('*').eq('project_id', project.id).order('id', { ascending: false })]).then(([c, i, pc, pi, g, b, s, sched, sevents, pay, co]) => {
       const sObj = {};
       (s.data || []).forEach(x => sObj[x.key] = x.value);
       setData({
@@ -1125,7 +1126,8 @@ function PrintModal({
         settings: sObj,
         scheduleItems: sched.data || [],
         scheduleEvents: sevents.data || [],
-        paymentStages: pay.data || []
+        paymentStages: pay.data || [],
+        changeOrders: co ? (co.data || []) : []
       });
       setLoading(false);
     });
@@ -1260,6 +1262,10 @@ function PrintModal({
     key: 'payment',
     label: ' 請款單',
     desc: '各期付款明細、本期應收、匯款資訊'
+  }, {
+    key: 'change',
+    label: ' 追加減明細',
+    desc: '追加減項目清單及含管理費總計'
   }].map(s => /*#__PURE__*/React.createElement("label", {
     key: s.key,
     style: {
@@ -6079,6 +6085,68 @@ function openPrintWindow(project, data, sections, paymentMode) {
       <div class="footer">${footerContent}</div>
     </div>`;
   }
+  // ── Change Orders Page ──
+  if (sections.change && data.changeOrders && data.changeOrders.length > 0) {
+    const co = data.changeOrders;
+    const mgmtR = (project.management_fee_rate || 7) / 100;
+    const baseTotal = co.reduce((s, o) => {
+      const d = (o.new_price || 0) * (o.new_quantity || 1) - (o.original_price || 0) * (o.original_quantity || 1);
+      return s + (o.change_type === 'reduce' ? -Math.abs(d) : d);
+    }, 0);
+    const mgmtAmt = Math.round(baseTotal * mgmtR);
+    const grandTotal = baseTotal + mgmtAmt;
+    const coRows = co.map(o => {
+      const diff = (o.new_price || 0) * (o.new_quantity || 1) - (o.original_price || 0) * (o.original_quantity || 1);
+      const actualDiff = o.change_type === 'reduce' ? -Math.abs(diff) : diff;
+      return `<tr>
+        <td style="padding:5px 10px;border-bottom:1px solid #EBEBEA;color:${o.change_type === 'add' ? '#3A5240' : '#DC2626'}">${o.change_type === 'add' ? '追加' : '追減'}</td>
+        <td style="padding:5px 10px;border-bottom:1px solid #EBEBEA">${esc(o.category_name || '')}</td>
+        <td style="padding:5px 10px;border-bottom:1px solid #EBEBEA">${esc(o.item_name || '')}</td>
+        <td style="padding:5px 6px;text-align:center;border-bottom:1px solid #EBEBEA">${esc(o.unit || '式')}</td>
+        <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${o.original_quantity ?? '-'}</td>
+        <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${o.new_quantity ?? '-'}</td>
+        <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${o.original_price ? fmtN(o.original_price) : '-'}</td>
+        <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA">${fmtN(o.new_price || 0)}</td>
+        <td style="padding:5px 6px;text-align:right;border-bottom:1px solid #EBEBEA;font-weight:600;color:${actualDiff >= 0 ? '#3A5240' : '#DC2626'}">${actualDiff >= 0 ? '+' : ''}${fmtN(actualDiff)}</td>
+      </tr>`;
+    }).join('');
+    body += `<div class="page">
+      ${workPageHeader}
+      <div style="text-align:center;font-size:17px;font-weight:700;letter-spacing:.3em;margin-bottom:20px">追 加 追 減 明 細</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:16px">
+        <thead>
+          <tr style="border-bottom:1.5px solid #333">
+            <th style="padding:5px 10px;text-align:left;font-weight:600;width:50px">類型</th>
+            <th style="padding:5px 10px;text-align:left;font-weight:600">歸屬大項</th>
+            <th style="padding:5px 10px;text-align:left;font-weight:600">項目說明</th>
+            <th style="padding:5px 6px;text-align:center;font-weight:600;width:40px">單位</th>
+            <th style="padding:5px 6px;text-align:right;font-weight:600;width:55px">原數量</th>
+            <th style="padding:5px 6px;text-align:right;font-weight:600;width:55px">新數量</th>
+            <th style="padding:5px 6px;text-align:right;font-weight:600;width:80px">原單價</th>
+            <th style="padding:5px 6px;text-align:right;font-weight:600;width:80px">新單價</th>
+            <th style="padding:5px 6px;text-align:right;font-weight:600;width:80px">差額</th>
+          </tr>
+        </thead>
+        <tbody>${coRows}</tbody>
+        <tfoot>
+          <tr style="border-top:1px solid #CCC">
+            <td colspan="8" style="padding:6px 10px;text-align:right;font-size:11px;color:#888">追加減小計</td>
+            <td style="padding:6px 6px;text-align:right;font-weight:600;color:${baseTotal >= 0 ? '#3A5240' : '#DC2626'}">${baseTotal >= 0 ? '+' : ''}${fmtN(baseTotal)}</td>
+          </tr>
+          <tr>
+            <td colspan="8" style="padding:4px 10px;text-align:right;font-size:11px;color:#888">監工管理費（${project.management_fee_rate || 7}%）</td>
+            <td style="padding:4px 6px;text-align:right;color:${mgmtAmt >= 0 ? '#3A5240' : '#DC2626'}">${mgmtAmt >= 0 ? '+' : ''}${fmtN(mgmtAmt)}</td>
+          </tr>
+          <tr style="border-top:1.5px solid #1A1A18">
+            <td colspan="8" style="padding:8px 10px;text-align:right;font-size:13px;font-weight:700">追加減總計（含管理費）</td>
+            <td style="padding:8px 6px;text-align:right;font-size:15px;font-weight:700;color:${grandTotal >= 0 ? '#3A5240' : '#DC2626'}">${grandTotal >= 0 ? '+' : ''}${fmtN(grandTotal)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="footer">${footerContent}</div>
+    </div>`;
+  }
+
   const html = `<!DOCTYPE html><html lang="zh-TW"><head>
     <meta charset="UTF-8">
     <title>${esc(project.name)} — 工程估價單</title>
@@ -6134,7 +6202,8 @@ function PrintModal({
     purchase: false,
     schedule: false,
     gallery: false,
-    payment: true
+    payment: true,
+    change: false
   });
   const [paymentMode, setPaymentMode] = useState('personal');
   const [data, setData] = useState(null);
@@ -6143,7 +6212,7 @@ function PrintModal({
     if (!open || !project) return;
     setData(null);
     setLoading(true);
-    Promise.all([db.from('work_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('work_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('gallery').select('*').eq('project_id', project.id).eq('is_selected', true), db.from('bank_accounts').select('*').order('sort_order'), db.from('settings').select('*'), db.from('schedule_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('schedule_events').select('*').eq('project_id', project.id).order('start_date'), db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order')]).then(([c, i, pc, pi, g, b, s, sched, sevents, pay]) => {
+    Promise.all([db.from('work_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('work_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('purchase_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('gallery').select('*').eq('project_id', project.id).eq('is_selected', true), db.from('bank_accounts').select('*').order('sort_order'), db.from('settings').select('*'), db.from('schedule_items').select('*').eq('project_id', project.id).order('sort_order'), db.from('schedule_events').select('*').eq('project_id', project.id).order('start_date'), db.from('payment_stages').select('*').eq('project_id', project.id).order('sort_order'), db.from('change_orders').select('*').eq('project_id', project.id).order('id', { ascending: false })]).then(([c, i, pc, pi, g, b, s, sched, sevents, pay, co]) => {
       const sObj = {};
       (s.data || []).forEach(x => sObj[x.key] = x.value);
       setData({
@@ -6156,7 +6225,8 @@ function PrintModal({
         settings: sObj,
         scheduleItems: sched.data || [],
         scheduleEvents: sevents.data || [],
-        paymentStages: pay.data || []
+        paymentStages: pay.data || [],
+        changeOrders: co ? (co.data || []) : []
       });
       setLoading(false);
     });
@@ -6291,6 +6361,10 @@ function PrintModal({
     key: 'payment',
     label: ' 請款單',
     desc: '各期付款明細、本期應收、匯款資訊'
+  }, {
+    key: 'change',
+    label: ' 追加減明細',
+    desc: '追加減項目清單及含管理費總計'
   }].map(s => /*#__PURE__*/React.createElement("label", {
     key: s.key,
     style: {
