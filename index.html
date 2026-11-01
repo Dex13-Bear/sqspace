@@ -8625,29 +8625,55 @@ function SettlementTab({
   const [importPreview, setImportPreview] = useState([]);
   const [showImport, setShowImport] = useState(false);
   const [vendors, setVendors] = useState([]);
+  const [changeOrders, setChangeOrders] = useState([]);
   ;
   const [uploading, setUploading] = useState(false);
   const [payForm, setPayForm] = useState({});
   const [showPayModal, setShowPayModal] = useState(null);
   const load = useCallback(async () => {
     const [{
-      data: r
+      data: r0,
+      error: rErr
     }, {
       data: i
     }, {
       data: c
     }, {
       data: v
-    }] = await Promise.all([db.from('vendor_settlements').select('*').eq('project_id', project.id).order('created_at'), db.from('work_items').select('*').eq('project_id', project.id), db.from('work_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('vendors').select('*').order('name')]);
+    }, {
+      data: co
+    }] = await Promise.all([db.from('vendor_settlements').select('*').eq('project_id', project.id).order('created_at'), db.from('work_items').select('*').eq('project_id', project.id), db.from('work_categories').select('*').eq('project_id', project.id).order('sort_order'), db.from('vendors').select('*').order('name'), db.from('change_orders').select('*').eq('project_id', project.id)]);
+    let r = r0;
+    let loadErr = rErr;
+    if (loadErr) {
+      // created_at 欄位可能不存在：不排序再讀一次
+      const retry = await db.from('vendor_settlements').select('*').eq('project_id', project.id);
+      if (!retry.error) {
+        r = retry.data;
+        loadErr = null;
+      }
+    }
+    if (loadErr) toast('讀取廠商估價失敗：' + (loadErr.message || JSON.stringify(loadErr)), 'error');
     setRecords(r || []);
     setWorkItems(i || []);
     setCats(c || []);
     setVendors(v || []);
+    setChangeOrders(co || []);
   }, [project.id]);
   useEffect(() => {
     load();
   }, [load]);
-  const quoted = workItems.filter(i => i.unit !== '__note__').reduce((s, i) => s + i.unit_price * i.quantity, 0);
+  const baseQuoted = workItems.filter(i => i.unit !== '__note__').reduce((s, i) => s + i.unit_price * i.quantity, 0);
+  // 追加追減（不含管理費，與工程明細報價口徑一致）計入業主報價
+  const coAmount = o => {
+    const d = (o.new_price || 0) * (o.new_quantity || 1) - (o.original_price || 0) * (o.original_quantity || 1);
+    return o.change_type === 'reduce' ? -Math.abs(d) : d;
+  };
+  const catChange = catName => changeOrders.filter(o => o.category_name === catName).reduce((s, o) => s + coAmount(o), 0);
+  const changeTotal = changeOrders.reduce((s, o) => s + coAmount(o), 0);
+  const orphanChange = changeOrders.filter(o => !cats.some(c => c.name === o.category_name)).reduce((s, o) => s + coAmount(o), 0);
+  const signed = n => (n < 0 ? '-' : '+') + fmt(Math.abs(n));
+  const quoted = baseQuoted + changeTotal;
   const totalVendor = records.reduce((s, r) => s + (r.actual_amount || 0), 0);
   const totalPaid = records.reduce((s, r) => s + (r.paid_amount || 0), 0);
   const catWorkItems = catId => workItems.filter(i => i.category_id === catId && i.unit !== '__note__');
@@ -8729,7 +8755,7 @@ function SettlementTab({
   };
   const doImport = async () => {
     if (!importPreview.length || !selectedCat) return;
-    await db.from('vendor_settlements').insert(importPreview.map(r => ({
+    const { error: impErr } = await db.from('vendor_settlements').insert(importPreview.map(r => ({
       project_id: project.id,
       category_name: selectedCat.name,
       vendor_name: r.vendor_name || '',
@@ -8740,6 +8766,10 @@ function SettlementTab({
       paid_amount: 0,
       is_paid: false
     })));
+    if (impErr) {
+      toast('匯入失敗：' + (impErr.message || JSON.stringify(impErr)), 'error');
+      return;
+    }
     toast(`已匯入 ${importPreview.length} 筆`);
     setShowImport(false);
     setImportText('');
@@ -8748,7 +8778,7 @@ function SettlementTab({
   };
   const addBlankRow = async () => {
     if (!selectedCat) return;
-    await db.from('vendor_settlements').insert({
+    const { error: addErr } = await db.from('vendor_settlements').insert({
       project_id: project.id,
       category_name: selectedCat.name,
       vendor_name: '',
@@ -8759,12 +8789,20 @@ function SettlementTab({
       paid_amount: 0,
       is_paid: false
     });
+    if (addErr) {
+      toast('新增失敗：' + (addErr.message || JSON.stringify(addErr)), 'error');
+      return;
+    }
     load();
   };
   const updateRecord = async (id, field, val) => {
-    await db.from('vendor_settlements').update({
+    const { error: updErr } = await db.from('vendor_settlements').update({
       [field]: val
     }).eq('id', id);
+    if (updErr) {
+      toast('儲存失敗：' + (updErr.message || JSON.stringify(updErr)), 'error');
+      return;
+    }
     setRecords(prev => prev.map(r => r.id === id ? {
       ...r,
       [field]: val
@@ -8772,7 +8810,11 @@ function SettlementTab({
   };
   const deleteRecord = async id => {
     if (!confirm('確認刪除？')) return;
-    await db.from('vendor_settlements').delete().eq('id', id);
+    const { error: delErr } = await db.from('vendor_settlements').delete().eq('id', id);
+    if (delErr) {
+      toast('刪除失敗：' + (delErr.message || JSON.stringify(delErr)), 'error');
+      return;
+    }
     load();
   };
   const uploadRecordImg = async (id, file) => {
@@ -8786,12 +8828,16 @@ function SettlementTab({
     setUploading(false);
   };
   const savePayment = async () => {
-    await db.from('vendor_settlements').update({
+    const { error: payErr } = await db.from('vendor_settlements').update({
       paid_amount: parseFloat(payForm.paid_amount) || 0,
       payment_date: payForm.payment_date || null,
       is_paid: payForm.is_paid || false,
       notes: payForm.notes || ''
     }).eq('id', showPayModal);
+    if (payErr) {
+      toast('儲存付款記錄失敗：' + (payErr.message || JSON.stringify(payErr)), 'error');
+      return;
+    }
     toast('已儲存付款記錄');
     setShowPayModal(null);
     load();
@@ -8800,7 +8846,8 @@ function SettlementTab({
   // ── Drill-in view ──
   if (selectedCat) {
     const recs = catRecords(selectedCat.name);
-    const catQuoted = catWorkItems(selectedCat.id).reduce((s, i) => s + i.unit_price * i.quantity, 0);
+    const catChangeAmt = catChange(selectedCat.name);
+    const catQuoted = catWorkItems(selectedCat.id).reduce((s, i) => s + i.unit_price * i.quantity, 0) + catChangeAmt;
     const catVendor = recs.reduce((s, r) => s + (r.actual_amount || 0), 0);
     const catPaid = recs.reduce((s, r) => s + (r.paid_amount || 0), 0);
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -8825,7 +8872,12 @@ function SettlementTab({
       style: {
         color: '#2E4D5C'
       }
-    }, fmt(catQuoted)), "\u3000 \u5EE0\u5546\u8CBB\u7528 ", /*#__PURE__*/React.createElement("strong", {
+    }, fmt(catQuoted)), catChangeAmt !== 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#999',
+        marginLeft: 4
+      }
+    }, "（含追加減 " + signed(catChangeAmt) + "）"), "\u3000 \u5EE0\u5546\u8CBB\u7528 ", /*#__PURE__*/React.createElement("strong", {
       style: {
         color: '#6B4835'
       }
@@ -9318,6 +9370,7 @@ function SettlementTab({
   }, [{
     label: '業主報價總額',
     value: fmt(quoted),
+    sub: changeTotal !== 0 ? '含追加減 ' + signed(changeTotal) + '（未含管理費）' : null,
     color: '#2E4D5C'
   }, {
     label: '廠商費用合計',
@@ -9352,7 +9405,13 @@ function SettlementTab({
       fontWeight: 700,
       color: c.color
     }
-  }, c.value)))), /*#__PURE__*/React.createElement("div", {
+  }, c.value), c.sub && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#999',
+      marginTop: 2
+    }
+  }, c.sub)))), /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card-header"
@@ -9399,7 +9458,8 @@ function SettlementTab({
       color: '#222'
     }
   }, "\u72C0\u614B"))), /*#__PURE__*/React.createElement("tbody", null, cats.map((cat, ci) => {
-    const q = catWorkItems(cat.id).reduce((s, i) => s + i.unit_price * i.quantity, 0);
+    const ch = catChange(cat.name);
+    const q = catWorkItems(cat.id).reduce((s, i) => s + i.unit_price * i.quantity, 0) + ch;
     const recs = catRecords(cat.name);
     const v = recs.reduce((s, r) => s + (r.actual_amount || 0), 0);
     const p = recs.reduce((s, r) => s + (r.paid_amount || 0), 0);
@@ -9432,7 +9492,13 @@ function SettlementTab({
       style: {
         color: '#2E4D5C'
       }
-    }, fmt(q)), /*#__PURE__*/React.createElement("td", {
+    }, fmt(q), ch !== 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: '#999',
+        fontWeight: 400
+      }
+    }, '含追加減 ' + signed(ch))), /*#__PURE__*/React.createElement("td", {
       className: "num",
       style: {
         color: v > 0 ? '#6B4835' : '#CCC',
@@ -9472,7 +9538,32 @@ function SettlementTab({
         color: '#8B2E2E'
       }
     }, "\u6B20 ", fmt(unpaid))));
-  })), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+  }), orphanChange !== 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    style: {
+      color: '#7A5A00',
+      fontSize: 13
+    }
+  }, "追加追減（未歸屬大項）"), /*#__PURE__*/React.createElement("td", {
+    className: "num",
+    style: {
+      color: '#2E4D5C'
+    }
+  }, signed(orphanChange)), /*#__PURE__*/React.createElement("td", {
+    className: "num",
+    style: {
+      color: '#CCC'
+    }
+  }, "–"), /*#__PURE__*/React.createElement("td", {
+    className: "num",
+    style: {
+      color: '#CCC'
+    }
+  }, "–"), /*#__PURE__*/React.createElement("td", {
+    className: "num",
+    style: {
+      color: '#CCC'
+    }
+  }, "–"), /*#__PURE__*/React.createElement("td", null))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
     style: {
       background: '#F5F5F5',
       fontWeight: 700,
