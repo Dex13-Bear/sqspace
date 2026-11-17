@@ -1429,28 +1429,19 @@ function LoginPage({
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
-  const ARTRIUM_ACCOUNTS = [{
-    id: 'user-HC',
-    username: 'HC',
-    password: 'SQ1234',
-    name: 'HC',
-    role: 'admin',
-    email: 'Dexigner13@gmail.com'
-  }, {
-    id: 'user-staff',
-    username: 'User',
-    password: 'SQ888',
-    name: 'User',
-    role: 'staff',
-    email: ''
-  }];
   const handleLogin = async () => {
     if (!un || !pw) return setErr('請輸入帳號與密碼');
     setLoading(true);
     setErr('');
-    await new Promise(r => setTimeout(r, 300));
-    const data = ARTRIUM_ACCOUNTS.find(a => a.username === un && a.password === pw) || null;
+    const {
+      data,
+      error
+    } = await db.rpc('app_login', {
+      p_username: un.trim(),
+      p_password: pw
+    });
     setLoading(false);
+    if (error) return setErr('連線錯誤：' + error.message);
     if (!data) return setErr('帳號或密碼錯誤');
     localStorage.setItem('user', JSON.stringify(data));
     onLogin(data);
@@ -10403,7 +10394,10 @@ function SupabaseSettings({
   const verify = async () => {
     const {
       data
-    } = await db.from('users').select('*').eq('username', user.username).eq('password', pw).single();
+    } = await db.rpc('app_verify_password', {
+      p_username: user.username,
+      p_password: pw
+    });
     if (!data) return toast('密碼錯誤', 'error');
     setUnlocked(true);
     setPw('');
@@ -10700,7 +10694,7 @@ function SystemAdminPage({
   });
   useEffect(() => {
     if (user.role !== 'admin') return;
-    db.from('users').select('*').order('created_at').then(r => setUsers(r.data || []));
+    db.from('users').select('id, username, name, role, email, granted_project_ids, created_at').order('created_at').then(r => setUsers(r.data || []));
     db.from('bank_accounts').select('*').order('sort_order').then(r => setBankAccounts(r.data || []));
     db.from('holidays').select('*').order('start_date').then(r => setHolidays(r.data || []));
     db.from('settings').select('*').then(r => {
@@ -10727,18 +10721,37 @@ function SystemAdminPage({
   };
   const addUser = async () => {
     if (!newUser.username || !newUser.password) return toast('請填寫帳號與密碼', 'error');
+    const actorPw = prompt('請輸入您的登入密碼以確認');
+    if (!actorPw) return;
     const {
       error
-    } = await db.from('users').insert(newUser);
-    if (error) return toast('帳號已存在', 'error');
+    } = await db.rpc('app_add_user', {
+      p_actor: user.username,
+      p_actor_password: actorPw,
+      p_username: newUser.username,
+      p_password: newUser.password,
+      p_name: newUser.display_name,
+      p_role: newUser.role
+    });
+    if (error) return toast(error.message, 'error');
     toast('已新增帳號');
     setShowAddUser(false);
-    db.from('users').select('*').order('created_at').then(r => setUsers(r.data || []));
+    db.from('users').select('id, username, name, role, email, granted_project_ids, created_at').order('created_at').then(r => setUsers(r.data || []));
   };
   const deleteUser = async id => {
     if (!confirm('確認刪除此帳號？')) return;
-    await db.from('users').delete().eq('id', id);
-    db.from('users').select('*').order('created_at').then(r => setUsers(r.data || []));
+    const actorPw = prompt('請輸入您的登入密碼以確認');
+    if (!actorPw) return;
+    const {
+      error
+    } = await db.rpc('app_delete_user', {
+      p_actor: user.username,
+      p_actor_password: actorPw,
+      p_user_id: id
+    });
+    if (error) return toast(error.message, 'error');
+    toast('已刪除帳號');
+    db.from('users').select('id, username, name, role, email, granted_project_ids, created_at').order('created_at').then(r => setUsers(r.data || []));
   };
   const addBank = async () => {
     await db.from('bank_accounts').insert({
@@ -10935,9 +10948,17 @@ function SystemAdminPage({
       className: "btn btn-primary",
       onClick: async () => {
         if (!newPw.trim()) return toast('請輸入新密碼', 'error');
-        await db.from('users').update({
-          password: newPw
-        }).eq('id', editPwUser.id);
+        const actorPw = prompt('請輸入您的登入密碼以確認');
+        if (!actorPw) return;
+        const {
+          error
+        } = await db.rpc('app_set_password', {
+          p_actor: user.username,
+          p_actor_password: actorPw,
+          p_user_id: editPwUser.id,
+          p_new_password: newPw
+        });
+        if (error) return toast(error.message, 'error');
         toast('密碼已更新');
         setEditPwUser(null);
         setNewPw('');
@@ -12535,7 +12556,7 @@ function ProjectMembersModal({
   const [members, setMembers] = useState([]);
   useEffect(() => {
     if (!open) return;
-    Promise.all([db.from('users').select('*').order('created_at'), db.from('project_members').select('*').eq('project_id', project.id)]).then(([u, m]) => {
+    Promise.all([db.from('users').select('id, username, name, role, email, granted_project_ids, created_at').order('created_at'), db.from('project_members').select('*').eq('project_id', project.id)]).then(([u, m]) => {
       setUsers(u.data || []);
       setMembers(m.data || []);
     });
@@ -12786,7 +12807,10 @@ function ProjectDetailPage({
   const verifyCostPw = async () => {
     const {
       data
-    } = await db.from('users').select('*').eq('username', user.username).eq('password', costPwInput).single();
+    } = await db.rpc('app_verify_password', {
+      p_username: user.username,
+      p_password: costPwInput
+    });
     if (!data) return toast('密碼錯誤', 'error');
     setShowCostPw(false);
     if (costPwTarget === 'cost') setShowCost(true);else if (costPwTarget === 'settlement') {
@@ -12823,7 +12847,10 @@ function ProjectDetailPage({
   const doUnlock = async () => {
     const {
       data
-    } = await db.from('users').select('*').eq('username', user.username).eq('password', unlockPw).single();
+    } = await db.rpc('app_verify_password', {
+      p_username: user.username,
+      p_password: unlockPw
+    });
     if (!data) return toast('密碼錯誤', 'error');
     await db.from('projects').update({
       is_locked: false
@@ -15004,7 +15031,12 @@ function SetupPage({
 function App() {
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('user'));
+      const u = JSON.parse(localStorage.getItem('user'));
+      if (u && String(u.id || '').startsWith('user-')) {
+        localStorage.removeItem('user');
+        return null;
+      }
+      return u;
     } catch {
       return null;
     }
@@ -15013,7 +15045,7 @@ function App() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectTab, setProjectTab] = useState('summary');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sbConfigured, setSbConfigured] = useState(() => { try { return !!(localStorage.getItem('sb_url') && localStorage.getItem('sb_key')); } catch(e) { return false; } });
+  const [sbConfigured, setSbConfigured] = useState(() => !!(SUPABASE_URL && SUPABASE_KEY));
   const closeSidebar = () => setSidebarOpen(false);
   const navTo = fn => {
     fn();
